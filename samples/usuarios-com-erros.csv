@@ -1,0 +1,8 @@
+name,email,password
+Fernanda Alves,fernanda.alves@exemplo.com,senha123
+,sem.nome@exemplo.com,senha123
+Gustavo Pereira,email-invalido,senha123
+Helena Costa,helena.costa@exemplo.com,123
+Fernanda Alves Duplicada,fernanda.alves@exemplo.com,senha123
+Igor Nunes,igor.nunes@exemplo.com
+Julia Ramos,julia.ramos@exemplo.com,senha123

@@ -8,6 +8,7 @@ import com.beca.users.application.port.in.UpdateUserUseCase;
 import com.beca.users.application.port.in.UpdateUserUseCase.UpdateUserCommand;
 import com.beca.users.domain.model.User;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,9 +17,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.List;
 
@@ -30,15 +35,18 @@ public class UserController {
     private final FindUserUseCase findUserUseCase;
     private final UpdateUserUseCase updateUserUseCase;
     private final DeleteUserUseCase deleteUserUseCase;
+    private final CsvUserImporter csvUserImporter;
 
     public UserController(CreateUserUseCase createUserUseCase,
                           FindUserUseCase findUserUseCase,
                           UpdateUserUseCase updateUserUseCase,
-                          DeleteUserUseCase deleteUserUseCase) {
+                          DeleteUserUseCase deleteUserUseCase,
+                          CsvUserImporter csvUserImporter) {
         this.createUserUseCase = createUserUseCase;
         this.findUserUseCase = findUserUseCase;
         this.updateUserUseCase = updateUserUseCase;
         this.deleteUserUseCase = deleteUserUseCase;
+        this.csvUserImporter = csvUserImporter;
     }
 
     @PostMapping
@@ -49,6 +57,16 @@ public class UserController {
 
         URI location = uriBuilder.path("/users/{id}").buildAndExpand(user.getId()).toUri();
         return ResponseEntity.created(location).body(UserResponse.from(user));
+    }
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<UserImportResponse> upload(@RequestParam("file") MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new InvalidCsvFileException("Arquivo CSV vazio");
+        }
+        try (InputStream input = file.getInputStream()) {
+            return ResponseEntity.ok(csvUserImporter.importUsers(input));
+        }
     }
 
     @GetMapping("/{id}")

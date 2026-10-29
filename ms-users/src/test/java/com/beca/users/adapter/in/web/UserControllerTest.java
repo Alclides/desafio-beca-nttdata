@@ -1,5 +1,6 @@
 package com.beca.users.adapter.in.web;
 
+import com.beca.users.adapter.in.web.UserImportResponse.LineError;
 import com.beca.users.application.port.in.CreateUserUseCase;
 import com.beca.users.application.port.in.CreateUserUseCase.CreateUserCommand;
 import com.beca.users.application.port.in.DeleteUserUseCase;
@@ -13,9 +14,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 
@@ -29,6 +32,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -52,6 +56,9 @@ class UserControllerTest {
 
     @MockitoBean
     private DeleteUserUseCase deleteUserUseCase;
+
+    @MockitoBean
+    private CsvUserImporter csvUserImporter;
 
     private static User user(Long id, String name, String email) {
         Instant now = Instant.parse("2026-01-01T10:00:00Z");
@@ -106,6 +113,54 @@ class UserControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value("E-mail já cadastrado: maria@teste.com"));
+    }
+
+    @Test
+    void upload_deveRetornarResumoDaImportacao() throws Exception {
+        when(csvUserImporter.importUsers(any())).thenReturn(new UserImportResponse(3, 2, 1,
+                List.of(new LineError(3, "maria@teste.com", "E-mail já cadastrado: maria@teste.com"))));
+
+        mockMvc.perform(multipart("/users/upload")
+                        .file(new MockMultipartFile("file", "usuarios.csv", "text/csv",
+                                "name,email,password\n".getBytes(StandardCharsets.UTF_8))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.successes").value(2))
+                .andExpect(jsonPath("$.failures").value(1))
+                .andExpect(jsonPath("$.errors[0].line").value(3))
+                .andExpect(jsonPath("$.errors[0].email").value("maria@teste.com"))
+                .andExpect(jsonPath("$.errors[0].reason").value("E-mail já cadastrado: maria@teste.com"));
+    }
+
+    @Test
+    void upload_deveRetornar400QuandoArquivoNaoEnviado() throws Exception {
+        mockMvc.perform(multipart("/users/upload"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        verifyNoInteractions(csvUserImporter);
+    }
+
+    @Test
+    void upload_deveRetornar400QuandoArquivoVazio() throws Exception {
+        mockMvc.perform(multipart("/users/upload")
+                        .file(new MockMultipartFile("file", "usuarios.csv", "text/csv", new byte[0])))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Arquivo CSV vazio"));
+
+        verifyNoInteractions(csvUserImporter);
+    }
+
+    @Test
+    void upload_deveRetornar400QuandoCsvInvalido() throws Exception {
+        when(csvUserImporter.importUsers(any()))
+                .thenThrow(new InvalidCsvFileException("Colunas obrigatórias ausentes no cabeçalho: password"));
+
+        mockMvc.perform(multipart("/users/upload")
+                        .file(new MockMultipartFile("file", "usuarios.csv", "text/csv",
+                                "name,email\n".getBytes(StandardCharsets.UTF_8))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Colunas obrigatórias ausentes no cabeçalho: password"));
     }
 
     @Test
