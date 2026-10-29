@@ -1,0 +1,68 @@
+services:
+  user-db:
+    image: postgres:16-alpine
+    container_name: user-db
+    environment:
+      POSTGRES_DB: users_db
+      POSTGRES_USER: ${DB_USER:-beca}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-beca123}
+    ports:
+      - "5433:5432"
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d users_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  transaction-db:
+    image: postgres:16-alpine
+    container_name: transaction-db
+    environment:
+      POSTGRES_DB: transactions_db
+      POSTGRES_USER: ${DB_USER:-beca}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-beca123}
+    ports:
+      - "5434:5432"
+    volumes:
+      - transaction-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d transactions_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ms-users:
+    build: ./ms-users
+    container_name: ms-users
+    environment:
+      DB_URL: jdbc:postgresql://user-db:5432/users_db
+      DB_USER: ${DB_USER:-beca}
+      DB_PASSWORD: ${DB_PASSWORD:-beca123}
+    ports:
+      - "8081:8081"
+    depends_on:
+      user-db:
+        condition: service_healthy
+
+  ms-transactions:
+    build: ./ms-transactions
+    container_name: ms-transactions
+    environment:
+      DB_URL: jdbc:postgresql://transaction-db:5432/transactions_db
+      DB_USER: ${DB_USER:-beca}
+      DB_PASSWORD: ${DB_PASSWORD:-beca123}
+      USERS_SERVICE_URL: http://ms-users:8081
+      MOCKAPI_URL: ${MOCKAPI_URL:-}
+    ports:
+      - "8082:8082"
+    depends_on:
+      transaction-db:
+        condition: service_healthy
+      ms-users:
+        condition: service_started
+
+volumes:
+  user-db-data:
+  transaction-db-data:

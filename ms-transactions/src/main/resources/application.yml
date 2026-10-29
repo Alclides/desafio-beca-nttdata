@@ -1,0 +1,25 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: ms-transactions
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/transactions_db}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+integrations:
+  users-url: ${USERS_SERVICE_URL:http://localhost:8081}
+  mockapi-url: ${MOCKAPI_URL:}
+  brasilapi-url: ${BRASILAPI_URL:https://brasilapi.com.br/api}
