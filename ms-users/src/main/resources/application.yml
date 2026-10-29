@@ -2,12 +2,15 @@ server:
   port: ${SERVER_PORT:8081}
 
 spring:
+  config:
+    # Ao rodar pela IDE, lê o .env da raiz (no Docker ele não existe e é ignorado)
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
   application:
     name: ms-users
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/users_db}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/users_db}
+    username: ${DB_USER:beca}
+    password: ${DB_PASSWORD:beca123}
   jpa:
     hibernate:
       ddl-auto: update
