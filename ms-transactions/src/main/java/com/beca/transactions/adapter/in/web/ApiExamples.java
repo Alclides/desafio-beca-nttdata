@@ -1,0 +1,70 @@
+package com.beca.transactions.adapter.in.web;
+
+// Exemplos de requisição e resposta exibidos no Swagger
+final class ApiExamples {
+
+    private ApiExamples() {
+    }
+
+    // Requisições: um exemplo por tipo de transação
+
+    static final String DEPOSIT = """
+            {"userId": 1, "type": "DEPOSIT", "amount": 3500.00, "description": "Salário de novembro"}
+            """;
+
+    static final String WITHDRAWAL = """
+            {"userId": 1, "type": "WITHDRAWAL", "amount": 200.00, "description": "Saque no caixa eletrônico"}
+            """;
+
+    static final String TRANSFER = """
+            {"userId": 1, "type": "TRANSFER", "amount": 150.00, "description": "Divisão do aluguel",
+             "destinationUserId": 2}
+            """;
+
+    static final String PURCHASE = """
+            {"userId": 1, "type": "PURCHASE", "amount": 89.90, "description": "Mercado do mês",
+             "category": "ALIMENTACAO"}
+            """;
+
+    static final String CORRECTION = """
+            {"userId": 1, "type": "DEPOSIT", "amount": 89.90, "description": "Estorno da compra 4",
+             "correctedTransactionId": 4}
+            """;
+
+    // Respostas
+
+    static final String APPROVED = """
+            {"id": 4, "userId": 1, "type": "PURCHASE", "amount": 89.90, "description": "Mercado do mês",
+             "category": "ALIMENTACAO", "destinationUserId": null, "correctedTransactionId": null,
+             "status": "APPROVED", "rejectedReason": null, "createdAt": "2026-11-03T18:00:00Z"}
+            """;
+
+    static final String REJECTED = """
+            {"id": 5, "userId": 1, "type": "WITHDRAWAL", "amount": 800.00, "description": "Saque",
+             "category": "OUTROS", "destinationUserId": null, "correctedTransactionId": null,
+             "status": "REJECTED", "rejectedReason": "Valor excede o limite por transação",
+             "createdAt": "2026-11-03T18:00:00Z"}
+            """;
+
+    // Erros (mesmo formato do GlobalExceptionHandler)
+
+    static final String VALIDATION = """
+            {"status": 400, "error": "Bad Request", "message": "Dados inválidos",
+             "fields": {"amount": "deve ser maior que 0"}, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
+
+    static final String BUSINESS_RULE = """
+            {"status": 400, "error": "Bad Request", "message": "Compra exige categoria",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
+
+    static final String INVALID_PERIOD = """
+            {"status": 400, "error": "Bad Request", "message": "Data inicial não pode ser depois da data final",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
+
+    static final String NOT_FOUND = """
+            {"status": 404, "error": "Not Found", "message": "Transação não encontrada: 99",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
+}

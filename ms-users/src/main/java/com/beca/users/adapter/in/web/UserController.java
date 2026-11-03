@@ -9,6 +9,7 @@ import com.beca.users.application.port.in.UpdateUserUseCase.UpdateUserCommand;
 import com.beca.users.domain.model.User;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -58,12 +59,13 @@ public class UserController {
 
     @Operation(summary = "Cria um novo usuário")
     @ApiResponses({
-            @ApiResponse(responseCode = "201",
-            description = "Usuário criado com sucesso"),
-            @ApiResponse(responseCode = "400",
-            description = "Falha na operação"),
-            @ApiResponse(responseCode = "409", description = "Email já cadastrado",
-            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "201", description = "Usuário criado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.VALIDATION))),
+            @ApiResponse(responseCode = "409", description = "E-mail já cadastrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.EMAIL_CONFLICT)))
     })
     @PostMapping
     public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request,
@@ -75,11 +77,17 @@ public class UserController {
         return ResponseEntity.created(location).body(UserResponse.from(user));
     }
 
-
-    @Operation(summary = "Cria usuários a partir de um arquivo CSV")
+    @Operation(summary = "Cria usuários a partir de um arquivo CSV",
+            description = "Colunas: name,email,password. Linhas inválidas não interrompem a importação "
+                    + "e voltam no resumo com o número da linha e o motivo.")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Usuários criados com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Arquivo inválido ou vazio", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "200", description = "Importação processada; veja o resumo de sucessos e falhas"),
+            @ApiResponse(responseCode = "400", description = "Arquivo vazio, ausente ou com cabeçalho inválido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.INVALID_CSV))),
+            @ApiResponse(responseCode = "413", description = "Arquivo maior que o limite permitido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.FILE_TOO_LARGE)))
     })
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UserImportResponse> upload(@RequestParam("file") MultipartFile file) throws IOException {
@@ -91,22 +99,21 @@ public class UserController {
         }
     }
 
-
     @Operation(summary = "Busca um usuário pelo ID")
-    @ApiResponses(value = {
+    @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
-            @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
+            @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.NOT_FOUND)))
     })
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> findById(@PathVariable Long id) {
         return ResponseEntity.ok(UserResponse.from(findUserUseCase.findById(id)));
     }
 
-
-    @Operation(summary = "Busca todos os usuários")
+    @Operation(summary = "Lista todos os usuários")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Usuários encontrados"),
-            @ApiResponse(responseCode = "404", description = "Erro ao procurar usuário")
+            @ApiResponse(responseCode = "200", description = "Lista de usuários; vazia quando não há cadastros")
     })
     @GetMapping
     public ResponseEntity<List<UserResponse>> findAll() {
@@ -116,12 +123,18 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
-    @Operation(summary = "Atualiza um usuário existente")
+    @Operation(summary = "Atualiza nome e e-mail de um usuário existente")
     @ApiResponses({
-            @ApiResponse(responseCode = "201",
-                    description = "Usuario atualizado com sucesso"),
-            @ApiResponse(responseCode = "400",
-                    description = "Falha na operação, dados inválidos"),
+            @ApiResponse(responseCode = "200", description = "Usuário atualizado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.VALIDATION))),
+            @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.NOT_FOUND))),
+            @ApiResponse(responseCode = "409", description = "E-mail já usado por outro usuário",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.EMAIL_CONFLICT)))
     })
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> update(@PathVariable Long id,
@@ -130,10 +143,12 @@ public class UserController {
         return ResponseEntity.ok(UserResponse.from(user));
     }
 
-    @Operation(summary = "Deleta um usuário existente")
+    @Operation(summary = "Remove um usuário existente")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Usuário deletado com sucesso", content = @Content()),
-            @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
+            @ApiResponse(responseCode = "204", description = "Usuário removido com sucesso", content = @Content()),
+            @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.NOT_FOUND)))
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

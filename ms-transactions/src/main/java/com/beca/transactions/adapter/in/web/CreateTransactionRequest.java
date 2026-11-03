@@ -12,13 +12,17 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 public record CreateTransactionRequest(
-        @Schema(example = "1") @NotNull Long userId,
+        @Schema(example = "1", description = "Usuário dono da transação") @NotNull Long userId,
         @Schema(example = "PURCHASE") @NotNull TransactionType type,
-        @Schema(example = "150.90") @NotNull @Positive @Digits(integer = 13, fraction = 2) BigDecimal amount,
-        @Schema(example = "Mercado do Mês") @Size(max = 255) String description,
-        @Schema(example = "ALIMENTACAO", description = "Obrigatorio caso seja uma compra") Category category,
-        @Schema(description = "Obrigatorio em caso de transferencia") Long destinationUserId,
-        @Schema(description = "Preencha para corrigir uma transação anterior") Long correctedTransactionId
+        @Schema(example = "150.90", description = "Valor em reais, maior que zero, até 2 casas decimais")
+        @NotNull @Positive @Digits(integer = 13, fraction = 2) BigDecimal amount,
+        @Schema(example = "Mercado do mês") @Size(max = 255) String description,
+        @Schema(example = "ALIMENTACAO", description = "Obrigatória em compra; nas demais, OUTROS quando não informada")
+        Category category,
+        @Schema(example = "2", description = "Obrigatório em transferência e proibido nos outros tipos")
+        Long destinationUserId,
+        @Schema(description = "Id da transação que esta corrige; a original continua gravada")
+        Long correctedTransactionId
 ) {
     CreateTransactionCommand command() {
         return new CreateTransactionCommand(userId, type, amount, description, category, destinationUserId, correctedTransactionId);
