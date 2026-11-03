@@ -2,9 +2,11 @@ package com.beca.transactions.adapter.out.account;
 
 import com.beca.transactions.application.port.out.AccountBalancePort;
 import com.beca.transactions.domain.model.AccountBalance;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
+@Component
 public class FakeAccountBalanceAdapter  implements AccountBalancePort {
     @Override
     public AccountBalance findByUserId(Long userId) {
