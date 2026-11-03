@@ -8,6 +8,8 @@ import com.beca.users.application.port.in.UpdateUserUseCase;
 import com.beca.users.application.port.in.UpdateUserUseCase.UpdateUserCommand;
 import com.beca.users.domain.model.User;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -59,7 +61,9 @@ public class UserController {
             @ApiResponse(responseCode = "201",
             description = "Usuário criado com sucesso"),
             @ApiResponse(responseCode = "400",
-            description = "Falha na operação")
+            description = "Falha na operação"),
+            @ApiResponse(responseCode = "409", description = "Email já cadastrado",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping
     public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request,
@@ -75,7 +79,7 @@ public class UserController {
     @Operation(summary = "Cria usuários a partir de um arquivo CSV")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Usuários criados com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Falha na operação")
+            @ApiResponse(responseCode = "400", description = "Arquivo inválido ou vazio", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UserImportResponse> upload(@RequestParam("file") MultipartFile file) throws IOException {
@@ -128,7 +132,7 @@ public class UserController {
 
     @Operation(summary = "Deleta um usuário existente")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Usuário deletado com sucesso"),
+            @ApiResponse(responseCode = "204", description = "Usuário deletado com sucesso", content = @Content()),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
     })
     @DeleteMapping("/{id}")

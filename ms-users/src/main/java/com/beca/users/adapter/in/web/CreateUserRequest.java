@@ -8,6 +8,6 @@ import jakarta.validation.constraints.Size;
 public record CreateUserRequest(
         @Schema(example = "Antonia Rodrigez") @NotBlank @Size(max = 100) String name,
         @Schema(example = "Antonia@gmail.com")@NotBlank @Email String email,
-        @Schema(example = "senha123 - NÃO COPIE")@NotBlank @Size(min = 6, max = 72) String password
+        @Schema(example = "senha123", description = "Entre 6 e 72 caracteres" )@NotBlank @Size(min = 6, max = 72) String password
 ) {
 }

@@ -26,3 +26,13 @@ integrations:
   users-url: ${USERS_SERVICE_URL:http://localhost:8081}
   mockapi-url: ${MOCKAPI_URL:}
   brasilapi-url: ${BRASILAPI_URL:https://brasilapi.com.br/api}
+
+
+springdoc:
+  api-docs:
+    override-with-generic-response: false
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha

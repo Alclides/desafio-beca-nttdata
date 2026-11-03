@@ -12,7 +12,6 @@ public class OpenApiConfig {
     public OpenAPI usersOpenApi() {
         return new OpenAPI().info(new Info()
                 .title("ms-users API")
-
                 .description("Microserviço de cadastro de Usuarios")
                 .version("v1.0.0"));
     }
