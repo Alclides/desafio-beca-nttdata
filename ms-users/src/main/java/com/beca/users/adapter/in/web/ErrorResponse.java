@@ -1,14 +1,16 @@
 package com.beca.users.adapter.in.web;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.Instant;
 import java.util.Map;
 
 public record ErrorResponse(
-        int status,
-        String error,
-        String message,
-        Map<String, String> fields,
-        Instant timestamp
+        @Schema(example = "400") int status,
+        @Schema(example = "Bad Request") String error,
+        @Schema(example = "Dados inválidos") String message,
+        @Schema(description = "Campo → mensagem; só aparece em erro de validação") Map<String, String> fields,
+        @Schema(example = "2026-11-03T18:00:00Z") Instant timestamp
 ) {
 
     static ErrorResponse of(int status, String error, String message) {
