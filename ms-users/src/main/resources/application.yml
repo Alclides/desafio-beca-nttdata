@@ -3,7 +3,6 @@ server:
 
 spring:
   config:
-    # Ao rodar pela IDE, lê o .env da raiz (no Docker ele não existe e é ignorado)
     import: optional:file:.env[.properties],optional:file:../.env[.properties]
   application:
     name: ms-users
@@ -24,6 +23,7 @@ management:
 
 springdoc:
   api-docs:
+    override-with-generic-response: false
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
