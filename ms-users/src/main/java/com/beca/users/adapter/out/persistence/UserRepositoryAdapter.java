@@ -1,7 +1,9 @@
 package com.beca.users.adapter.out.persistence;
 
 import com.beca.users.application.port.out.UserRepositoryPort;
+import com.beca.users.domain.exception.EmailAlreadyExistsException;
 import com.beca.users.domain.model.User;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -18,8 +20,14 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
 
     @Override
     public User save(User user) {
-        UserEntity saved = repository.save(UserPersistenceMapper.toEntity(user));
-        return UserPersistenceMapper.toDomain(saved);
+        try {
+            UserEntity saved = repository.save(UserPersistenceMapper.toEntity(user));
+            return UserPersistenceMapper.toDomain(saved);
+        } catch (DataIntegrityViolationException ex) {
+            // Duas requisições com o mesmo e-mail podem passar juntas pelo existsByEmail do service;
+            // a constraint unique da coluna email barra a segunda, e aqui ela vira o erro de domínio (409)
+            throw new EmailAlreadyExistsException("E-mail já cadastrado: " + user.getEmail());
+        }
     }
 
     @Override
