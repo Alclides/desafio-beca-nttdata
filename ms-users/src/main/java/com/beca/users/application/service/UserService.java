@@ -12,6 +12,7 @@ import com.beca.users.domain.model.User;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUserUseCase, DeleteUserUseCase {
 
@@ -25,15 +26,16 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
 
     @Override
     public User create(CreateUserCommand command) {
-        if (repository.existsByEmail(command.email())) {
-            throw new EmailAlreadyExistsException("E-mail já cadastrado: " + command.email());
+        String email = normalizeEmail(command.email());
+        if (repository.existsByEmail(email)) {
+            throw new EmailAlreadyExistsException("E-mail já cadastrado: " + email);
         }
 
         Instant now = Instant.now();
         User user = new User(
                 null,
                 command.name(),
-                command.email(),
+                email,
                 passwordEncoder.encode(command.password()),
                 now,
                 now
@@ -55,14 +57,15 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     @Override
     public User update(Long id, UpdateUserCommand command) {
         User user = findById(id);
+        String email = normalizeEmail(command.email());
 
-        boolean emailChanged = !user.getEmail().equals(command.email());
-        if (emailChanged && repository.existsByEmail(command.email())) {
-            throw new EmailAlreadyExistsException("E-mail já cadastrado: " + command.email());
+        boolean emailChanged = !user.getEmail().equals(email);
+        if (emailChanged && repository.existsByEmail(email)) {
+            throw new EmailAlreadyExistsException("E-mail já cadastrado: " + email);
         }
 
         user.setName(command.name());
-        user.setEmail(command.email());
+        user.setEmail(email);
         user.setUpdatedAt(Instant.now());
         return repository.save(user);
     }
@@ -73,5 +76,9 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
             throw new UserNotFoundException("Usuário não encontrado: " + id);
         }
         repository.deleteById(id);
+    }
+
+    private static String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }
