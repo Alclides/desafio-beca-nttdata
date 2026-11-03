@@ -1,4 +1,4 @@
-package com.beca.transactions.aplication.port.in;
+package com.beca.transactions.application.port.in;
 
 import com.beca.transactions.domain.model.Category;
 import com.beca.transactions.domain.model.Transaction;
