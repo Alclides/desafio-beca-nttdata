@@ -36,7 +36,7 @@ public class MockApiAccountBalanceAdapter implements AccountBalancePort {
                     .map(MockApiAccountResponse::toDomain)
                     .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada para o usuário: " + userId));
         } catch (HttpClientErrorException.NotFound e) {
-            // O MockAPI responde 404 quando o filtro por userId não encontra nenhuma conta
+            // O MockAPI tem que responder 404 quando o filtro por userId não encontra nenhuma conta
             throw new AccountNotFoundException("Conta não encontrada para o usuário: " + userId);
         } catch (RestClientException | IllegalArgumentException e) {
             throw new AccountServiceUnavailableException("Falha ao consultar serviço de saldo: " + e.getMessage());
