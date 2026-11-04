@@ -8,9 +8,9 @@ spring:
   application:
     name: ms-transactions
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5434/transactions_db}
-    username: ${DB_USER:beca}
-    password: ${DB_PASSWORD:beca123}
+    url: ${TRANSACTIONS_DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: update
