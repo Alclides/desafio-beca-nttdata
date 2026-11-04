@@ -1,5 +1,6 @@
 package com.beca.transactions.adapter.out.account;
 
+import com.beca.transactions.domain.exception.AccountNotFoundException;
 import com.beca.transactions.domain.exception.AccountServiceUnavailableException;
 import com.beca.transactions.domain.model.AccountBalance;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 ;
@@ -71,7 +73,16 @@ class MockApiTest {
                 .andRespond(withSuccess("[" + CONTA_10 + "]", MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> adapter.findByUserId(1L))
-                .isInstanceOf(AccountServiceUnavailableException.class);
+                .isInstanceOf(AccountNotFoundException.class);
+    }
+
+    @Test
+    void findByUserId_deveLancarContaNaoEncontradaQuandoMockApiRetornar404() {
+        server.expect(requestTo(URL))
+                .andRespond(withResourceNotFound());
+
+        assertThatThrownBy(() -> adapter.findByUserId(1L))
+                .isInstanceOf(AccountNotFoundException.class);
     }
 
     @Test

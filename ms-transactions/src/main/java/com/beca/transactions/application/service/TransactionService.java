@@ -4,6 +4,7 @@ import com.beca.transactions.application.port.in.CreateTransactionUseCase;
 import com.beca.transactions.application.port.in.FindTransactionUseCase;
 import com.beca.transactions.application.port.out.AccountBalancePort;
 import com.beca.transactions.application.port.out.TransactionRepositoryPort;
+import com.beca.transactions.domain.exception.AccountNotFoundException;
 import com.beca.transactions.domain.exception.AccountServiceUnavailableException;
 import com.beca.transactions.domain.exception.InvalidTransactionException;
 import com.beca.transactions.domain.exception.TransactionNotFoundException;
@@ -83,8 +84,11 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
         AccountBalance account;
         try {
             account = accountBalancePort.findByUserId(tx.getUserId());
+        } catch (AccountNotFoundException e) {
+            tx.reject("ACCOUNT_NOT_FOUND: Conta não encontrada para o usuário");
+            return;
         } catch (AccountServiceUnavailableException e) {
-            tx.reject("Serviço de saldo indisponível, tente novamente mais tarde!");
+            tx.reject("BALANCE_SERVICE_UNAVAILABLE: Serviço de saldo indisponível, tente novamente mais tarde!");
             return;
         }
 
