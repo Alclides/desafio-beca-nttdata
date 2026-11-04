@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Objects;
 
 @Entity
@@ -45,6 +46,18 @@ public class TransactionEntity {
 
     @Column(name = "rejected_reason")
     private String rejectedReason;
+
+    @Column(name = "usd_rate", precision = 10, scale = 4)
+    private BigDecimal usdRate;
+
+    @Column(name = "usd_rate_date")
+    private LocalDate usdRateDate;
+
+    @Column(name = "eur_rate", precision = 10, scale = 4)
+    private BigDecimal eurRate;
+
+    @Column(name = "eur_rate_date")
+    private LocalDate eurRateDate;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -147,6 +160,38 @@ public class TransactionEntity {
 
     public void setRejectedReason(String rejectedReason) {
         this.rejectedReason = rejectedReason;
+    }
+
+    public BigDecimal getUsdRate() {
+        return usdRate;
+    }
+
+    public void setUsdRate(BigDecimal usdRate) {
+        this.usdRate = usdRate;
+    }
+
+    public LocalDate getUsdRateDate() {
+        return usdRateDate;
+    }
+
+    public void setUsdRateDate(LocalDate usdRateDate) {
+        this.usdRateDate = usdRateDate;
+    }
+
+    public BigDecimal getEurRate() {
+        return eurRate;
+    }
+
+    public void setEurRate(BigDecimal eurRate) {
+        this.eurRate = eurRate;
+    }
+
+    public LocalDate getEurRateDate() {
+        return eurRateDate;
+    }
+
+    public void setEurRateDate(LocalDate eurRateDate) {
+        this.eurRateDate = eurRateDate;
     }
 
     public Instant getCreatedAt() {

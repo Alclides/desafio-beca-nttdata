@@ -3,12 +3,16 @@ package com.beca.transactions.application.service;
 import com.beca.transactions.application.port.in.CreateTransactionUseCase;
 import com.beca.transactions.application.port.in.FindTransactionUseCase;
 import com.beca.transactions.application.port.out.AccountBalancePort;
+import com.beca.transactions.application.port.out.ExchangeRatePort;
 import com.beca.transactions.application.port.out.TransactionRepositoryPort;
 import com.beca.transactions.domain.exception.AccountNotFoundException;
 import com.beca.transactions.domain.exception.AccountServiceUnavailableException;
+import com.beca.transactions.domain.exception.ExchangeRateUnavailableException;
 import com.beca.transactions.domain.exception.InvalidTransactionException;
 import com.beca.transactions.domain.exception.TransactionNotFoundException;
 import com.beca.transactions.domain.model.AccountBalance;
+import com.beca.transactions.domain.model.ExchangeRate;
+import com.beca.transactions.domain.model.ExchangeRates;
 import com.beca.transactions.domain.model.Transaction;
 import com.beca.transactions.domain.model.TransactionType;
 import com.beca.transactions.domain.service.TransactionApprovalPolicy;
@@ -26,13 +30,15 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
     private final TransactionRepositoryPort transactionRepositoryPort;
     private final AccountBalancePort accountBalancePort;
     private final TransactionApprovalPolicy transactionApprovalPolicy;
+    private final ExchangeRatePort exchangeRatePort;
 
     public TransactionService(TransactionRepositoryPort transactionRepositoryPort,
                               AccountBalancePort accountBalancePort,
-                              TransactionApprovalPolicy transactionApprovalPolicy) {
+                              TransactionApprovalPolicy transactionApprovalPolicy, ExchangeRatePort exchangeRatePort) {
         this.transactionRepositoryPort = transactionRepositoryPort;
         this.accountBalancePort = accountBalancePort;
         this.transactionApprovalPolicy = transactionApprovalPolicy;
+        this.exchangeRatePort = exchangeRatePort;
     }
 
     @Override
@@ -48,13 +54,17 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
         } else {
             tx.approve();
         }
+        tryApplyExchangeRates(tx);
         return transactionRepositoryPort.save(tx);
     }
 
     @Override
     public Transaction findById(Long transactionId) {
-        return transactionRepositoryPort.findById(transactionId)
-                .orElseThrow(() -> new TransactionNotFoundException("Transação não encontrada: " + transactionId));
+        Transaction tx = loadOrThrow(transactionId);
+        if (!tx.hasExchangeRates() && tryApplyExchangeRates(tx)) {
+            return transactionRepositoryPort.save(tx);
+        }
+        return tx;
     }
 
     @Override
@@ -70,11 +80,30 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
         return transactionRepositoryPort.findByUser(userId, startOf(start), startOf(end.plusDays(1)), type);
     }
 
+    private Transaction loadOrThrow(Long transactionId) {
+        return transactionRepositoryPort.findById(transactionId)
+                .orElseThrow(() -> new TransactionNotFoundException("Transação não encontrada: " + transactionId));
+    }
+
+    // Tudo ou nada: sem as duas moedas, nada é gravado e a busca é refeita na próxima consulta por id.
+    // Usa a data de criação para uma transação antiga receber a taxa da época dela.
+    private boolean tryApplyExchangeRates(Transaction tx) {
+        LocalDate date = tx.getCreatedAt().atZone(ZONE).toLocalDate();
+        try {
+            ExchangeRate usd = exchangeRatePort.findLatest("USD", date);
+            ExchangeRate eur = exchangeRatePort.findLatest("EUR", date);
+            tx.applyExchangeRates(new ExchangeRates(usd, eur));
+            return true;
+        } catch (ExchangeRateUnavailableException e) {
+            return false;
+        }
+    }
+
     private void validateCorrection(CreateTransactionCommand command) {
         if (command.correctedTransactionId() == null) {
             return;
         }
-        Transaction original = findById(command.correctedTransactionId());
+        Transaction original = loadOrThrow(command.correctedTransactionId());
         if (!original.getUserId().equals(command.userId())) {
             throw new InvalidTransactionException("Só é possível corrigir transações próprias");
         }

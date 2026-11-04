@@ -36,14 +36,19 @@ final class ApiExamples {
     static final String APPROVED = """
             {"id": 4, "userId": 1, "type": "PURCHASE", "amount": 89.90, "description": "Mercado do mês",
              "category": "ALIMENTACAO", "destinationUserId": null, "correctedTransactionId": null,
-             "status": "APPROVED", "rejectedReason": null, "createdAt": "2026-11-03T18:00:00Z"}
+             "status": "APPROVED", "rejectedReason": null, "createdAt": "2026-11-04T18:00:00Z",
+             "conversion": {"available": true, "reason": null, "rates": [
+               {"currency": "USD", "rate": 5.4935, "rateDate": "2026-11-03", "convertedAmount": 16.36},
+               {"currency": "EUR", "rate": 6.1500, "rateDate": "2026-11-03", "convertedAmount": 14.62}
+             ]}}
             """;
 
     static final String REJECTED = """
             {"id": 5, "userId": 1, "type": "WITHDRAWAL", "amount": 800.00, "description": "Saque",
              "category": "OUTROS", "destinationUserId": null, "correctedTransactionId": null,
              "status": "REJECTED", "rejectedReason": "Valor excede o limite por transação",
-             "createdAt": "2026-11-03T18:00:00Z"}
+             "createdAt": "2026-11-03T18:00:00Z",
+             "conversion": {"available": false, "reason": "Cotação indisponível no momento", "rates": []}}
             """;
 
     static final String BALANCE = """

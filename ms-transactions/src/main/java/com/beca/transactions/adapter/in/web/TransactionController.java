@@ -80,7 +80,9 @@ public class TransactionController {
         return ResponseEntity.created(location).body(TransactionResponse.from(transaction));
     }
 
-    @Operation(summary = "Busca uma transação pelo ID")
+    @Operation(summary = "Busca uma transação pelo ID",
+            description = "Mostra o valor em real, dólar e euro, com a taxa e a data. Se a transação estiver sem taxa, "
+                    + "tenta buscar de novo e grava; se a BrasilAPI falhar, responde com conversion.available = false.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Transação encontrada"),
             @ApiResponse(responseCode = "404", description = "Transação não encontrada",
@@ -93,7 +95,8 @@ public class TransactionController {
     }
 
     @Operation(summary = "Lista as transações de um usuário",
-            description = "Ordenadas da mais recente para a mais antiga. Sem período informado, usa o mês atual.")
+            description = "Ordenadas da mais recente para a mais antiga. Sem período informado, usa o mês atual. "
+                    + "Não chama a BrasilAPI: transações sem taxa vêm com conversion.available = false.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de transações; vazia quando não há nenhuma no período"),
             @ApiResponse(responseCode = "400", description = "Parâmetro ausente, data em formato inválido ou período invertido",

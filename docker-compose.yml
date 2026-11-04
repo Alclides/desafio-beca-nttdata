@@ -55,6 +55,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?}
       USERS_SERVICE_URL: http://ms-users:8081
       MOCKAPI_URL: ${MOCKAPI_URL:-}
+      BRASILAPI_URL: ${BRASILAPI_URL:-https://brasilapi.com.br/api}
     ports:
       - "8082:8082"
     depends_on:

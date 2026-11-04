@@ -19,10 +19,12 @@ public class Transaction {
     private TransactionStatus status;
     private String rejectedReason;
     private final Instant createdAt;
+    private ExchangeRates exchangeRates;
+
 
     public Transaction(Long id, Long userId, TransactionType type, BigDecimal amount, String description,
                        Category category, Long destinationUserId, Long correctedTransactionId,
-                       TransactionStatus status, String rejectedReason, Instant createdAt) {
+                       TransactionStatus status, String rejectedReason, ExchangeRates exchangeRates , Instant createdAt) {
         this.id = id;
         this.userId = userId;
         this.type = type;
@@ -33,7 +35,9 @@ public class Transaction {
         this.correctedTransactionId = correctedTransactionId;
         this.status = status;
         this.rejectedReason = rejectedReason;
+        this.exchangeRates = exchangeRates;
         this.createdAt = createdAt;
+
     }
 
     public static Transaction create(Long userId, TransactionType type, BigDecimal amount, String description,
@@ -55,7 +59,7 @@ public class Transaction {
 
         Category finalCategory = category != null ? category : Category.OUTROS;
         return new Transaction(null, userId, type, amount, description, finalCategory,
-                destinationUserId, correctedTransactionId, null, null, Instant.now());
+                destinationUserId, correctedTransactionId, null, null, null, Instant.now());
     }
 
     public void approve() {
@@ -117,6 +121,16 @@ public class Transaction {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public ExchangeRates getExchangeRates() { return exchangeRates; }
+
+    public boolean hasExchangeRates() {
+        return exchangeRates != null;
+    }
+
+    public void applyExchangeRates(ExchangeRates exchangeRates) {
+        this.exchangeRates = exchangeRates;
     }
 
     @Override
