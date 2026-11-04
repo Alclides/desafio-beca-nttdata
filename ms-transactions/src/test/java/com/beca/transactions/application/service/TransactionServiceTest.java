@@ -3,6 +3,7 @@ package com.beca.transactions.application.service;
 import com.beca.transactions.application.port.in.CreateTransactionUseCase.CreateTransactionCommand;
 import com.beca.transactions.application.port.out.AccountBalancePort;
 import com.beca.transactions.application.port.out.TransactionRepositoryPort;
+import com.beca.transactions.domain.exception.AccountNotFoundException;
 import com.beca.transactions.domain.exception.AccountServiceUnavailableException;
 import com.beca.transactions.domain.exception.InvalidTransactionException;
 import com.beca.transactions.domain.exception.TransactionNotFoundException;
@@ -165,7 +166,20 @@ class TransactionServiceTest {
         Transaction result = service.create(comando(TransactionType.WITHDRAWAL, "100", null));
 
         assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
-        assertThat(result.getRejectedReason()).contains("indisponível");
+        assertThat(result.getRejectedReason()).startsWith("BALANCE_SERVICE_UNAVAILABLE").contains("indisponível");
+        verify(repository, never()).sumApprovedOutgoing(anyLong(), any(), any());
+        verify(repository).save(result);
+    }
+
+    @Test
+    void create_deveRejeitarEGravarQuandoUsuarioNaoTemConta() {
+        when(accountBalancePort.findByUserId(1L)).thenThrow(new AccountNotFoundException("sem conta"));
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(comando(TransactionType.WITHDRAWAL, "100", null));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
+        assertThat(result.getRejectedReason()).startsWith("ACCOUNT_NOT_FOUND");
         verify(repository, never()).sumApprovedOutgoing(anyLong(), any(), any());
         verify(repository).save(result);
     }

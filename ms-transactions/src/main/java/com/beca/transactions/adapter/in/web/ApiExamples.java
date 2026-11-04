@@ -46,7 +46,22 @@ final class ApiExamples {
              "createdAt": "2026-11-03T18:00:00Z"}
             """;
 
+    static final String BALANCE = """
+            {"userId": 1, "balance": 1000.00, "dailyLimit": 2000.00, "perTransactionLimit": 500.00}
+            """;
+
     // Erros (mesmo formato do GlobalExceptionHandler)
+
+    static final String ACCOUNT_NOT_FOUND = """
+            {"status": 404, "error": "Not Found", "message": "Conta não encontrada para o usuário: 99",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
+
+    static final String BALANCE_UNAVAILABLE = """
+            {"status": 503, "error": "Service Unavailable",
+             "message": "Serviço de saldo indisponível, tente novamente mais tarde!",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
 
     static final String VALIDATION = """
             {"status": 400, "error": "Bad Request", "message": "Dados inválidos",
