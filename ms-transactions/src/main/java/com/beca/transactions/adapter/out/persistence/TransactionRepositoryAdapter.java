@@ -54,4 +54,9 @@ public class TransactionRepositoryAdapter implements TransactionRepositoryPort {
     public BigDecimal sumApprovedOutgoing(Long userId, Instant start, Instant end) {
         return repository.sumStatusAndTypes(userId, TransactionStatus.APPROVED, OUTGOING_TYPES, start, end);
     }
+
+    @Override
+    public boolean hasApprovedCorrection(Long correctedTransactionId) {
+        return repository.existsByCorrectedTransactionIdAndStatus(correctedTransactionId, TransactionStatus.APPROVED);
+    }
 }

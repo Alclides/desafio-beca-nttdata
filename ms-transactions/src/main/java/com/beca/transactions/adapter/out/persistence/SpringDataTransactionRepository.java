@@ -31,4 +31,6 @@ public interface SpringDataTransactionRepository extends JpaRepository<Transacti
                                  @Param("types") Collection<TransactionType> types,
                                  @Param("start") Instant start,
                                  @Param("end") Instant end);
+
+    boolean existsByCorrectedTransactionIdAndStatus(Long correctedTransactionId, TransactionStatus status);
 }
