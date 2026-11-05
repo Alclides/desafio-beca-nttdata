@@ -1,5 +1,6 @@
 package com.beca.users.application.service;
 
+import com.beca.users.application.port.in.AuthenticateUserUseCase;
 import com.beca.users.application.port.in.CreateUserUseCase;
 import com.beca.users.application.port.in.DeleteUserUseCase;
 import com.beca.users.application.port.in.FindUserUseCase;
@@ -7,13 +8,14 @@ import com.beca.users.application.port.in.UpdateUserUseCase;
 import com.beca.users.application.port.out.PasswordEncoderPort;
 import com.beca.users.application.port.out.UserRepositoryPort;
 import com.beca.users.domain.exception.EmailAlreadyExistsException;
+import com.beca.users.domain.exception.InvalidCredentialsException;
 import com.beca.users.domain.exception.UserNotFoundException;
 import com.beca.users.domain.model.User;
 
 import java.time.Instant;
 import java.util.List;
 
-public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUserUseCase, DeleteUserUseCase {
+public class UserService implements AuthenticateUserUseCase, CreateUserUseCase, FindUserUseCase, UpdateUserUseCase, DeleteUserUseCase {
 
     private final UserRepositoryPort repository;
     private final PasswordEncoderPort passwordEncoder;
@@ -73,5 +75,13 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
             throw new UserNotFoundException("Usuário não encontrado: " + id);
         }
         repository.deleteById(id);
+    }
+
+    // A mesma mensagem nos dois casos, para não revelar quais e-mails estão cadastrados
+    @Override
+    public User authenticate(String email, String password) {
+        return repository.findByEmail(email)
+                .filter(user -> passwordEncoder.matches(password, user.getPassword()))
+                .orElseThrow(() -> new InvalidCredentialsException("E-mail ou senha incorretos"));
     }
 }

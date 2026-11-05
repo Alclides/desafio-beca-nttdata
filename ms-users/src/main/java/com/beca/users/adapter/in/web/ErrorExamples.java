@@ -31,4 +31,9 @@ final class ErrorExamples {
             {"status": 413, "error": "Payload Too Large", "message": "Arquivo maior que o limite permitido",
              "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
             """;
+
+    static final String INVALID_CREDENTIALS = """
+            {"status": 401, "error": "Unauthorized", "message": "E-mail ou senha incorretos",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
 }
