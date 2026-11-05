@@ -10,12 +10,10 @@ import com.beca.transactions.domain.exception.AccountServiceUnavailableException
 import com.beca.transactions.domain.exception.ExchangeRateUnavailableException;
 import com.beca.transactions.domain.exception.InvalidTransactionException;
 import com.beca.transactions.domain.exception.TransactionNotFoundException;
-import com.beca.transactions.domain.model.AccountBalance;
-import com.beca.transactions.domain.model.ExchangeRate;
-import com.beca.transactions.domain.model.ExchangeRates;
-import com.beca.transactions.domain.model.Transaction;
-import com.beca.transactions.domain.model.TransactionType;
+import com.beca.transactions.domain.model.*;
 import com.beca.transactions.domain.service.TransactionApprovalPolicy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -31,6 +29,7 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
     private final AccountBalancePort accountBalancePort;
     private final TransactionApprovalPolicy transactionApprovalPolicy;
     private final ExchangeRatePort exchangeRatePort;
+    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
 
     public TransactionService(TransactionRepositoryPort transactionRepositoryPort,
                               AccountBalancePort accountBalancePort,
@@ -55,7 +54,9 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
             tx.approve();
         }
         tryApplyExchangeRates(tx);
-        return transactionRepositoryPort.save(tx);
+        Transaction saved = transactionRepositoryPort.save(tx);
+        updateBalances(saved);
+        return saved;
     }
 
     @Override
@@ -85,8 +86,6 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
                 .orElseThrow(() -> new TransactionNotFoundException("Transação não encontrada: " + transactionId));
     }
 
-    // Tudo ou nada: sem as duas moedas, nada é gravado e a busca é refeita na próxima consulta por id.
-    // Usa a data de criação para uma transação antiga receber a taxa da época dela.
     private boolean tryApplyExchangeRates(Transaction tx) {
         LocalDate date = tx.getCreatedAt().atZone(ZONE).toLocalDate();
         try {
@@ -106,6 +105,9 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
         Transaction original = loadOrThrow(command.correctedTransactionId());
         if (!original.getUserId().equals(command.userId())) {
             throw new InvalidTransactionException("Só é possível corrigir transações próprias");
+        }
+        if (original.getStatus() != TransactionStatus.APPROVED) {
+            throw new InvalidTransactionException("Só é possível corrigir transações aprovadas");
         }
     }
 
@@ -131,5 +133,25 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
 
     private static Instant startOf(LocalDate date) {
         return date.atStartOfDay(ZONE).toInstant();
+    }
+
+    private void updateBalances(Transaction tx) {
+        if (tx.getStatus() != TransactionStatus.APPROVED) {
+            return;
+        }
+        BigDecimal delta = tx.getType().isOutgoing() ? tx.getAmount().negate() : tx.getAmount();
+        tryAdjustBalance(tx.getUserId(), delta, tx.getId());
+
+        if (tx.getType() == TransactionType.TRANSFER) {
+            tryAdjustBalance(tx.getDestinationUserId(), tx.getAmount(), tx.getId());
+        }
+    }
+
+    private void tryAdjustBalance(Long userId, BigDecimal delta, Long transactionId) {
+        try {
+            accountBalancePort.adjustBalance(userId, delta);
+        } catch (AccountNotFoundException | AccountServiceUnavailableException e) {
+            log.warn("Saldo não atualizado: transação {}, usuário {}: {}", transactionId, userId, e.getMessage());
+        }
     }
 }
