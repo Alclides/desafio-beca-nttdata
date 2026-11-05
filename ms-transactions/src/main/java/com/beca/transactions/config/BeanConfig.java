@@ -3,6 +3,7 @@ package com.beca.transactions.config;
 import com.beca.transactions.application.port.out.AccountBalancePort;
 import com.beca.transactions.application.port.out.ExchangeRatePort;
 import com.beca.transactions.application.port.out.TransactionRepositoryPort;
+import com.beca.transactions.application.port.out.UserDirectoryPort;
 import com.beca.transactions.application.service.AccountBalanceService;
 import com.beca.transactions.application.service.ExpenseAnalysisService;
 import com.beca.transactions.application.service.TransactionService;
@@ -22,9 +23,9 @@ public class BeanConfig {
     }
 
     @Bean
-    public TransactionService transactionService(TransactionRepositoryPort transactionRepository, AccountBalancePort accountBalancePort, TransactionApprovalPolicy transactionApprovalPolicy, ExchangeRatePort exchangeRatePort) {
+    public TransactionService transactionService(TransactionRepositoryPort transactionRepository, AccountBalancePort accountBalancePort, TransactionApprovalPolicy transactionApprovalPolicy, ExchangeRatePort exchangeRatePort, UserDirectoryPort userDirectoryPort) {
 
-        return new TransactionService(transactionRepository, accountBalancePort, transactionApprovalPolicy, exchangeRatePort);
+        return new TransactionService(transactionRepository, accountBalancePort, transactionApprovalPolicy, exchangeRatePort, userDirectoryPort);
 
     }
 

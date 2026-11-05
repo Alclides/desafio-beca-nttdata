@@ -45,6 +45,8 @@ public class TransactionController {
     @Operation(summary = "Registra uma transação",
             description = "Depósito é aprovado direto. Retirada, transferência e compra passam pelas regras de saldo, "
                     + "limite por transação e limite diário. Aprovada ou rejeitada, a transação é gravada e volta com 201. "
+                    + "O usuário e o destino são confirmados no serviço de usuários: quem não existe recebe 404, e com o "
+                    + "serviço fora do ar a transação é gravada como REJECTED. "
                     + "Estorno: informe correctedTransactionId, o mesmo valor da original e o tipo inverso (DEPOSIT para "
                     + "saídas, WITHDRAWAL para depósitos); cada transação aprovada aceita um único estorno aprovado. "
                     + "O estorno de transferência debita o destino e é rejeitado se ele não tiver saldo.")
@@ -70,9 +72,12 @@ public class TransactionController {
                                     @ExampleObject(name = "Validação de campos", value = ApiExamples.VALIDATION),
                                     @ExampleObject(name = "Regra de negócio", value = ApiExamples.BUSINESS_RULE)
                             })),
-            @ApiResponse(responseCode = "404", description = "Transação a corrigir não encontrada",
+            @ApiResponse(responseCode = "404", description = "Usuário, destino da transferência ou transação a corrigir não encontrados",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(value = ApiExamples.NOT_FOUND)))
+                            examples = {
+                                    @ExampleObject(name = "Usuário", value = ApiExamples.USER_NOT_FOUND),
+                                    @ExampleObject(name = "Transação a corrigir", value = ApiExamples.NOT_FOUND)
+                            }))
     })
     @PostMapping
     public ResponseEntity<TransactionResponse> create(@Valid @RequestBody CreateTransactionRequest request,

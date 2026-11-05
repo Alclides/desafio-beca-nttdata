@@ -4,11 +4,14 @@ import com.beca.transactions.application.port.in.CreateTransactionUseCase.Create
 import com.beca.transactions.application.port.out.AccountBalancePort;
 import com.beca.transactions.application.port.out.ExchangeRatePort;
 import com.beca.transactions.application.port.out.TransactionRepositoryPort;
+import com.beca.transactions.application.port.out.UserDirectoryPort;
 import com.beca.transactions.domain.exception.AccountNotFoundException;
 import com.beca.transactions.domain.exception.AccountServiceUnavailableException;
 import com.beca.transactions.domain.exception.ExchangeRateUnavailableException;
 import com.beca.transactions.domain.exception.InvalidTransactionException;
 import com.beca.transactions.domain.exception.TransactionNotFoundException;
+import com.beca.transactions.domain.exception.UserNotFoundException;
+import com.beca.transactions.domain.exception.UserServiceUnavailableException;
 import com.beca.transactions.domain.model.AccountBalance;
 import com.beca.transactions.domain.model.Category;
 import com.beca.transactions.domain.model.ExchangeRate;
@@ -63,6 +66,9 @@ class TransactionServiceTest {
     @Mock
     private ExchangeRatePort exchangeRatePort;
 
+    @Mock
+    private UserDirectoryPort userDirectoryPort;
+
     private TransactionService service;
 
     private static final ExchangeRate USD = new ExchangeRate("USD", new BigDecimal("5.4935"), LocalDate.of(2026, 11, 3));
@@ -71,7 +77,10 @@ class TransactionServiceTest {
     @BeforeEach
     void setUp() {
         // Só as portas são mocks; a policy é a real, para o teste exercitar as regras de verdade
-        service = new TransactionService(repository, accountBalancePort, new TransactionApprovalPolicy(), exchangeRatePort);
+        service = new TransactionService(repository, accountBalancePort, new TransactionApprovalPolicy(), exchangeRatePort, userDirectoryPort);
+
+        // Por padrão o usuário existe; os testes de usuário sobrescrevem
+        lenient().when(userDirectoryPort.exists(anyLong())).thenReturn(true);
 
         // Por padrão a BrasilAPI está fora do ar; os testes de câmbio sobrescrevem com cambioDisponivel()
         lenient().when(exchangeRatePort.findLatest(any(), any()))
@@ -767,5 +776,83 @@ class TransactionServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
         verify(accountBalancePort, never()).adjustBalance(anyLong(), any());
+    }
+
+    @Test
+    void create_deveConfirmarOUsuarioNoServicoDeUsuarios() {
+        saveDevolveOQueRecebeu();
+
+        service.create(comando(TransactionType.DEPOSIT, "100", null));
+
+        verify(userDirectoryPort).exists(1L);
+    }
+
+    @Test
+    void create_deveFalharSemGravarQuandoOUsuarioNaoExiste() {
+        when(userDirectoryPort.exists(1L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.create(comando(TransactionType.DEPOSIT, "100", null)))
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessage("Usuário não encontrado: 1");
+
+        verify(repository, never()).save(any());
+        verifyNoInteractions(accountBalancePort);
+    }
+
+    @Test
+    void create_deveFalharSemGravarQuandoODestinoDaTransferenciaNaoExiste() {
+        when(userDirectoryPort.exists(2L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.create(transferenciaParaUsuario2("100")))
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessage("Usuário não encontrado: 2");
+
+        verify(repository, never()).save(any());
+        verifyNoInteractions(accountBalancePort);
+    }
+
+    @Test
+    void create_deveConfirmarOrigemEDestinoNaTransferencia() {
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(transferenciaParaUsuario2("100"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+        verify(userDirectoryPort).exists(1L);
+        verify(userDirectoryPort).exists(2L);
+    }
+
+    @Test
+    void create_deveRejeitarEGravarQuandoOServicoDeUsuariosEstaForaDoAr() {
+        when(userDirectoryPort.exists(1L)).thenThrow(new UserServiceUnavailableException("fora do ar"));
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(comando(TransactionType.PURCHASE, "100", Category.LAZER));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
+        assertThat(result.getRejectedReason()).startsWith("USER_SERVICE_UNAVAILABLE");
+        verify(repository).save(result);
+        verifyNoInteractions(accountBalancePort);
+    }
+
+    @Test
+    void create_naoDeveAprovarDepositoComOServicoDeUsuariosForaDoAr() {
+        when(userDirectoryPort.exists(1L)).thenThrow(new UserServiceUnavailableException("fora do ar"));
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(comando(TransactionType.DEPOSIT, "100", null));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
+        verify(accountBalancePort, never()).adjustBalance(anyLong(), any());
+    }
+
+    @Test
+    void findById_naoDeveConsultarOServicoDeUsuarios() {
+        when(repository.findById(5L)).thenReturn(Optional.of(transacaoGravada(5L, new ExchangeRates(USD, EUR), Instant.now())));
+
+        service.findById(5L);
+
+        verifyNoInteractions(userDirectoryPort);
     }
 }
