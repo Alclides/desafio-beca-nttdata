@@ -1,5 +1,7 @@
 package com.beca.transactions.adapter.out.persistence;
 
+import com.beca.transactions.domain.model.ExchangeRate;
+import com.beca.transactions.domain.model.ExchangeRates;
 import com.beca.transactions.domain.model.Transaction;
 
 final class TransactionPersistenceMapper {
@@ -8,7 +10,7 @@ final class TransactionPersistenceMapper {
     }
 
     static TransactionEntity toEntity(Transaction transaction) {
-        return new TransactionEntity(
+        TransactionEntity entity = new TransactionEntity(
                 transaction.getId(),
                 transaction.getUserId(),
                 transaction.getType(),
@@ -21,6 +23,15 @@ final class TransactionPersistenceMapper {
                 transaction.getRejectedReason(),
                 transaction.getCreatedAt()
         );
+
+        if (transaction.hasExchangeRates()) {
+            ExchangeRates rates = transaction.getExchangeRates();
+            entity.setUsdRate(rates.usd().rate());
+            entity.setUsdRateDate(rates.usd().rateDate());
+            entity.setEurRate(rates.eur().rate());
+            entity.setEurRateDate(rates.eur().rateDate());
+        }
+        return entity;
     }
 
     static Transaction toDomain(TransactionEntity entity) {
@@ -35,7 +46,19 @@ final class TransactionPersistenceMapper {
                 entity.getCorrectedTransactionId(),
                 entity.getStatus(),
                 entity.getRejectedReason(),
+                exchangeRatesOf(entity),
                 entity.getCreatedAt()
+        );
+    }
+
+    // Transações sem taxa gravada (API fora do ar ou criadas antes do câmbio) voltam com null
+    private static ExchangeRates exchangeRatesOf(TransactionEntity entity) {
+        if (entity.getUsdRate() == null || entity.getEurRate() == null) {
+            return null;
+        }
+        return new ExchangeRates(
+                new ExchangeRate("USD", entity.getUsdRate(), entity.getUsdRateDate()),
+                new ExchangeRate("EUR", entity.getEurRate(), entity.getEurRateDate())
         );
     }
 }

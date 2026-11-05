@@ -1,6 +1,7 @@
 package com.beca.transactions.config;
 
 import com.beca.transactions.application.port.out.AccountBalancePort;
+import com.beca.transactions.application.port.out.ExchangeRatePort;
 import com.beca.transactions.application.port.out.TransactionRepositoryPort;
 import com.beca.transactions.application.service.AccountBalanceService;
 import com.beca.transactions.application.service.TransactionService;
@@ -17,9 +18,9 @@ public class BeanConfig {
     }
 
     @Bean
-    public TransactionService transactionService(TransactionRepositoryPort transactionRepository, AccountBalancePort accountBalancePort, TransactionApprovalPolicy transactionApprovalPolicy) {
+    public TransactionService transactionService(TransactionRepositoryPort transactionRepository, AccountBalancePort accountBalancePort, TransactionApprovalPolicy transactionApprovalPolicy, ExchangeRatePort exchangeRatePort) {
 
-        return new TransactionService(transactionRepository, accountBalancePort, transactionApprovalPolicy);
+        return new TransactionService(transactionRepository, accountBalancePort, transactionApprovalPolicy, exchangeRatePort);
 
     }
 
