@@ -4,6 +4,7 @@ import com.beca.transactions.domain.exception.InvalidTransactionException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,6 +26,7 @@ class TransactionTest {
         assertThat(tx.getUserId()).isEqualTo(1L);
         assertThat(tx.getType()).isEqualTo(TransactionType.PURCHASE);
         assertThat(tx.getAmount()).isEqualByComparingTo("100");
+        assertThat(tx.getDescription()).isEqualTo("Mercado");
         assertThat(tx.getCategory()).isEqualTo(Category.ALIMENTACAO);
         assertThat(tx.getStatus()).isNull();
         assertThat(tx.getRejectedReason()).isNull();
@@ -159,5 +161,33 @@ class TransactionTest {
 
         assertThatThrownBy(tx::approve).isInstanceOf(IllegalStateException.class);
         assertThat(tx.getStatus()).isEqualTo(TransactionStatus.REJECTED);
+    }
+
+    private static Transaction gravada(Long id, String valor) {
+        return new Transaction(id, 1L, TransactionType.DEPOSIT, new BigDecimal(valor), "Depósito",
+                Category.OUTROS, null, null, TransactionStatus.APPROVED, null, null, Instant.now());
+    }
+
+    @Test
+    void equals_deveConsiderarIguaisTransacoesComMesmoId() {
+        // Igualdade é pela identidade (id), não pelos dados
+        Transaction a = gravada(1L, "100");
+        Transaction b = gravada(1L, "999");
+
+        assertThat(a).isEqualTo(b);
+        assertThat(a).hasSameHashCodeAs(b);
+    }
+
+    @Test
+    void equals_deveConsiderarDiferentesTransacoesComIdsDiferentes() {
+        assertThat(gravada(1L, "100")).isNotEqualTo(gravada(2L, "100"));
+    }
+
+    @Test
+    void equals_deveSerDiferenteDeNullEDeOutroTipo() {
+        Transaction tx = gravada(1L, "100");
+
+        assertThat(tx.equals(null)).isFalse();
+        assertThat(tx.equals("1")).isFalse();
     }
 }
