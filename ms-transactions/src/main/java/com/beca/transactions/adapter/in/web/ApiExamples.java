@@ -55,6 +55,27 @@ final class ApiExamples {
             {"userId": 1, "balance": 1000.00, "dailyLimit": 2000.00, "perTransactionLimit": 500.00}
             """;
 
+    static final String EXPENSES_BY_CATEGORY = """
+            {"from": "2026-11-01", "to": "2026-11-30", "lines": [
+              {"key": "ALIMENTACAO", "total": 150.00},
+              {"key": "LAZER", "total": 30.00}
+            ], "total": 180.00}
+            """;
+
+    static final String EXPENSES_BY_DAY = """
+            {"from": "2026-11-01", "to": "2026-11-30", "lines": [
+              {"key": "2026-11-03", "total": 100.00},
+              {"key": "2026-11-05", "total": 80.00}
+            ], "total": 180.00}
+            """;
+
+    static final String EXPENSES_BY_MONTH = """
+            {"from": "2026-10-01", "to": "2026-11-30", "lines": [
+              {"key": "2026-10", "total": 250.00},
+              {"key": "2026-11", "total": 180.00}
+            ], "total": 430.00}
+            """;
+
     // Erros (mesmo formato do GlobalExceptionHandler)
 
     static final String ACCOUNT_NOT_FOUND = """
