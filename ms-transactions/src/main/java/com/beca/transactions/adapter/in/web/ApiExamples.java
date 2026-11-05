@@ -78,6 +78,11 @@ final class ApiExamples {
 
     // Erros (mesmo formato do GlobalExceptionHandler)
 
+    static final String USER_NOT_FOUND = """
+            {"status": 404, "error": "Not Found", "message": "Usuário não encontrado: 99",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
+
     static final String ACCOUNT_NOT_FOUND = """
             {"status": 404, "error": "Not Found", "message": "Conta não encontrada para o usuário: 99",
              "fields": null, "timestamp": "2026-11-03T18:00:00Z"}

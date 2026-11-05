@@ -5,11 +5,8 @@ import com.beca.transactions.application.port.in.FindTransactionUseCase;
 import com.beca.transactions.application.port.out.AccountBalancePort;
 import com.beca.transactions.application.port.out.ExchangeRatePort;
 import com.beca.transactions.application.port.out.TransactionRepositoryPort;
-import com.beca.transactions.domain.exception.AccountNotFoundException;
-import com.beca.transactions.domain.exception.AccountServiceUnavailableException;
-import com.beca.transactions.domain.exception.ExchangeRateUnavailableException;
-import com.beca.transactions.domain.exception.InvalidTransactionException;
-import com.beca.transactions.domain.exception.TransactionNotFoundException;
+import com.beca.transactions.application.port.out.UserDirectoryPort;
+import com.beca.transactions.domain.exception.*;
 import com.beca.transactions.domain.model.*;
 import com.beca.transactions.domain.service.TransactionApprovalPolicy;
 import org.slf4j.Logger;
@@ -31,14 +28,16 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
     private final TransactionApprovalPolicy transactionApprovalPolicy;
     private final ExchangeRatePort exchangeRatePort;
     private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
+    private final UserDirectoryPort userDirectoryPort;
 
     public TransactionService(TransactionRepositoryPort transactionRepositoryPort,
                               AccountBalancePort accountBalancePort,
-                              TransactionApprovalPolicy transactionApprovalPolicy, ExchangeRatePort exchangeRatePort) {
+                              TransactionApprovalPolicy transactionApprovalPolicy, ExchangeRatePort exchangeRatePort, UserDirectoryPort userDirectoryPort) {
         this.transactionRepositoryPort = transactionRepositoryPort;
         this.accountBalancePort = accountBalancePort;
         this.transactionApprovalPolicy = transactionApprovalPolicy;
         this.exchangeRatePort = exchangeRatePort;
+        this.userDirectoryPort = userDirectoryPort;
     }
 
     @Override
@@ -49,10 +48,12 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
                 command.description(), command.category(),
                 command.destinationUserId(), command.correctedTransactionId());
 
-        if (tx.getType().isOutgoing()) {
-            decide(tx);
-        } else {
-            reversalBlocker(original).ifPresentOrElse(tx::reject, tx::approve);
+        if (usersConfirmed(tx)) {
+            if (tx.getType().isOutgoing()) {
+                decide(tx);
+            } else {
+                reversalBlocker(original).ifPresentOrElse(tx::reject, tx::approve);
+            }
         }
         tryApplyExchangeRates(tx);
         Transaction saved = transactionRepositoryPort.save(tx);
@@ -186,6 +187,25 @@ public class TransactionService implements CreateTransactionUseCase, FindTransac
             accountBalancePort.adjustBalance(userId, delta);
         } catch (AccountNotFoundException | AccountServiceUnavailableException e) {
             log.warn("Saldo não atualizado: transação {}, usuário {}: {}", transactionId, userId, e.getMessage());
+        }
+    }
+
+    private boolean usersConfirmed(Transaction tx) {
+        try {
+            ensureExists(tx.getUserId());
+            if (tx.getType() == TransactionType.TRANSFER) {
+                ensureExists(tx.getDestinationUserId());
+            }
+            return true;
+        } catch (UserServiceUnavailableException e) {
+            tx.reject("USER_SERVICE_UNAVAILABLE: Não foi possível confirmar o usuário, tente novamente mais tarde!");
+            return false;
+        }
+    }
+
+    private void ensureExists(Long userId) {
+        if (!userDirectoryPort.exists(userId)) {
+            throw new UserNotFoundException("Usuário não encontrado: " + userId);
         }
     }
 }
