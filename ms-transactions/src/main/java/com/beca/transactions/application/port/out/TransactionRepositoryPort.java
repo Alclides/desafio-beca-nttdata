@@ -16,4 +16,6 @@ public interface TransactionRepositoryPort {
     List<Transaction> findByUser(Long userId, Instant start, Instant end, TransactionType type);
 
     BigDecimal sumApprovedOutgoing(Long userId, Instant start, Instant end);
+
+    boolean hasApprovedCorrection(Long correctedTransactionId);
 }

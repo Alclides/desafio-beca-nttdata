@@ -44,7 +44,10 @@ public class TransactionController {
 
     @Operation(summary = "Registra uma transação",
             description = "Depósito é aprovado direto. Retirada, transferência e compra passam pelas regras de saldo, "
-                    + "limite por transação e limite diário. Aprovada ou rejeitada, a transação é gravada e volta com 201.")
+                    + "limite por transação e limite diário. Aprovada ou rejeitada, a transação é gravada e volta com 201. "
+                    + "Estorno: informe correctedTransactionId, o mesmo valor da original e o tipo inverso (DEPOSIT para "
+                    + "saídas, WITHDRAWAL para depósitos); cada transação aprovada aceita um único estorno aprovado. "
+                    + "O estorno de transferência debita o destino e é rejeitado se ele não tiver saldo.")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
             schema = @Schema(implementation = CreateTransactionRequest.class),
             examples = {

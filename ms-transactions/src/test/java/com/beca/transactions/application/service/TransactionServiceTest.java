@@ -591,4 +591,181 @@ class TransactionServiceTest {
         verify(repository, never()).save(any());
         verifyNoInteractions(accountBalancePort);
     }
+
+    // Original aprovada de R$ 100 do usuário 1; na transferência o destino é o usuário 2
+    private void originalGravada(TransactionType type, Long correctedTransactionId) {
+        Long destino = type == TransactionType.TRANSFER ? 2L : null;
+        Transaction original = new Transaction(10L, 1L, type, new BigDecimal("100.00"), "Original",
+                Category.OUTROS, destino, correctedTransactionId, TransactionStatus.APPROVED, null, null, Instant.now());
+        when(repository.findById(10L)).thenReturn(Optional.of(original));
+    }
+
+    private static CreateTransactionCommand estorno(TransactionType type, String valor) {
+        return new CreateTransactionCommand(1L, type, new BigDecimal(valor), "Estorno", null, null, 10L);
+    }
+
+    private static AccountBalance contaDoDestino(String saldo) {
+        return new AccountBalance(2L, new BigDecimal(saldo), new BigDecimal("2000"), new BigDecimal("500"));
+    }
+
+    private void estornoRecusado(CreateTransactionCommand comando, String mensagem) {
+        assertThatThrownBy(() -> service.create(comando))
+                .isInstanceOf(InvalidTransactionException.class)
+                .hasMessage(mensagem);
+
+        verify(repository, never()).save(any());
+        verify(accountBalancePort, never()).adjustBalance(anyLong(), any());
+    }
+
+    @Test
+    void estorno_deTransferenciaDeveCreditarOrigemEDebitarDestino() {
+        originalGravada(TransactionType.TRANSFER, null);
+        when(accountBalancePort.findByUserId(2L)).thenReturn(contaDoDestino("100"));
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(estorno(TransactionType.DEPOSIT, "100"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+        verify(accountBalancePort).adjustBalance(eq(1L), valor("100"));
+        verify(accountBalancePort).adjustBalance(eq(2L), valor("-100"));
+    }
+
+    @Test
+    void estorno_deCompraDeveCreditarSoAOrigem() {
+        originalGravada(TransactionType.PURCHASE, null);
+        saveDevolveOQueRecebeu();
+
+        service.create(estorno(TransactionType.DEPOSIT, "100"));
+
+        verify(accountBalancePort).adjustBalance(eq(1L), valor("100"));
+        verify(accountBalancePort, times(1)).adjustBalance(anyLong(), any());
+        verify(accountBalancePort, never()).findByUserId(anyLong());
+    }
+
+    @Test
+    void estorno_deDepositoDeveDebitarAOrigem() {
+        originalGravada(TransactionType.DEPOSIT, null);
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(estorno(TransactionType.WITHDRAWAL, "100"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+        verify(accountBalancePort).adjustBalance(eq(1L), valor("-100"));
+    }
+
+    @Test
+    void estorno_deveCompararOValorSemConsiderarAsCasasDecimais() {
+        originalGravada(TransactionType.PURCHASE, null);
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(estorno(TransactionType.DEPOSIT, "100"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+    }
+
+    @Test
+    void estorno_naoDevePermitirSegundoEstorno() {
+        originalGravada(TransactionType.TRANSFER, null);
+        when(repository.hasApprovedCorrection(10L)).thenReturn(true);
+
+        estornoRecusado(estorno(TransactionType.DEPOSIT, "100"), "Esta transação já foi estornada");
+    }
+
+    @Test
+    void estorno_devePermitirNovaTentativaDepoisDeUmEstornoRejeitado() {
+        originalGravada(TransactionType.PURCHASE, null);
+        // Um estorno rejeitado não conta como estorno aprovado
+        when(repository.hasApprovedCorrection(10L)).thenReturn(false);
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(estorno(TransactionType.DEPOSIT, "100"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+    }
+
+    @Test
+    void estorno_naoDeveAceitarValorMaiorQueOOriginal() {
+        originalGravada(TransactionType.TRANSFER, null);
+
+        estornoRecusado(estorno(TransactionType.DEPOSIT, "300"), "O estorno deve ter o mesmo valor da transação original");
+    }
+
+    @Test
+    void estorno_naoDeveAceitarValorMenorQueOOriginal() {
+        originalGravada(TransactionType.TRANSFER, null);
+
+        estornoRecusado(estorno(TransactionType.DEPOSIT, "99.99"), "O estorno deve ter o mesmo valor da transação original");
+    }
+
+    @Test
+    void estorno_naoDeveAceitarTipoErradoParaSaida() {
+        originalGravada(TransactionType.PURCHASE, null);
+
+        estornoRecusado(estorno(TransactionType.WITHDRAWAL, "100"), "O estorno desta transação deve ser do tipo DEPOSIT");
+    }
+
+    @Test
+    void estorno_naoDeveAceitarTipoErradoParaDeposito() {
+        originalGravada(TransactionType.DEPOSIT, null);
+
+        estornoRecusado(estorno(TransactionType.DEPOSIT, "100"), "O estorno desta transação deve ser do tipo WITHDRAWAL");
+    }
+
+    @Test
+    void estorno_naoDevePermitirEstornarUmEstorno() {
+        originalGravada(TransactionType.DEPOSIT, 9L);
+
+        estornoRecusado(estorno(TransactionType.WITHDRAWAL, "100"), "Não é possível estornar um estorno");
+    }
+
+    @Test
+    void estorno_deveSerRejeitadoQuandoODestinoNaoTemSaldo() {
+        originalGravada(TransactionType.TRANSFER, null);
+        when(accountBalancePort.findByUserId(2L)).thenReturn(contaDoDestino("99.99"));
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(estorno(TransactionType.DEPOSIT, "100"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
+        assertThat(result.getRejectedReason()).startsWith("DESTINATION_INSUFFICIENT_BALANCE");
+        verify(repository).save(result);
+        verify(accountBalancePort, never()).adjustBalance(anyLong(), any());
+    }
+
+    @Test
+    void estorno_deveSerAprovadoQuandoODestinoTemExatamenteOValor() {
+        originalGravada(TransactionType.TRANSFER, null);
+        when(accountBalancePort.findByUserId(2L)).thenReturn(contaDoDestino("100"));
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(estorno(TransactionType.DEPOSIT, "100"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+    }
+
+    @Test
+    void estorno_deveSerRejeitadoQuandoNaoConsegueConfirmarOSaldoDoDestino() {
+        originalGravada(TransactionType.TRANSFER, null);
+        when(accountBalancePort.findByUserId(2L)).thenThrow(new AccountServiceUnavailableException("fora do ar"));
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(estorno(TransactionType.DEPOSIT, "100"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
+        assertThat(result.getRejectedReason()).startsWith("BALANCE_SERVICE_UNAVAILABLE");
+        verify(accountBalancePort, never()).adjustBalance(anyLong(), any());
+    }
+
+    @Test
+    void estorno_deveSerRejeitadoQuandoODestinoNaoTemConta() {
+        originalGravada(TransactionType.TRANSFER, null);
+        when(accountBalancePort.findByUserId(2L)).thenThrow(new AccountNotFoundException("sem conta"));
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(estorno(TransactionType.DEPOSIT, "100"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
+        verify(accountBalancePort, never()).adjustBalance(anyLong(), any());
+    }
 }
