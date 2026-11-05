@@ -20,7 +20,8 @@ public record TransactionResponse(
         @Schema(description = "Preenchido quando esta transação corrige outra") Long correctedTransactionId,
         @Schema(example = "APPROVED") TransactionStatus status,
         @Schema(description = "Motivo, quando o status é REJECTED") String rejectedReason,
-        @Schema(example = "2026-11-03T18:00:00Z") Instant createdAt
+        @Schema(example = "2026-11-03T18:00:00Z") Instant createdAt,
+        @Schema(description = "Valor convertido em outras moedas") ConversionResponse conversion
 ) {
 
     static TransactionResponse from(Transaction transaction) {
@@ -35,7 +36,8 @@ public record TransactionResponse(
                 transaction.getCorrectedTransactionId(),
                 transaction.getStatus(),
                 transaction.getRejectedReason(),
-                transaction.getCreatedAt()
+                transaction.getCreatedAt(),
+                ConversionResponse.from(transaction)
         );
     }
 }

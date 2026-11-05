@@ -37,9 +37,9 @@ services:
     build: ./ms-users
     container_name: ms-users
     environment:
-      DB_URL: jdbc:postgresql://user-db:5432/users_db
-      DB_USER: ${DB_USER:-beca}
-      DB_PASSWORD: ${DB_PASSWORD:-beca123}
+      USERS_DB_URL: jdbc:postgresql://user-db:5432/users_db
+      DB_USER: ${DB_USER:?}
+      DB_PASSWORD: ${DB_PASSWORD:?}
     ports:
       - "8081:8081"
     depends_on:
@@ -50,11 +50,12 @@ services:
     build: ./ms-transactions
     container_name: ms-transactions
     environment:
-      DB_URL: jdbc:postgresql://transaction-db:5432/transactions_db
-      DB_USER: ${DB_USER:-beca}
-      DB_PASSWORD: ${DB_PASSWORD:-beca123}
+      TRANSACTIONS_DB_URL: jdbc:postgresql://transaction-db:5432/transactions_db
+      DB_USER: ${DB_USER:?}
+      DB_PASSWORD: ${DB_PASSWORD:?}
       USERS_SERVICE_URL: http://ms-users:8081
       MOCKAPI_URL: ${MOCKAPI_URL:-}
+      BRASILAPI_URL: ${BRASILAPI_URL:-https://brasilapi.com.br/api}
     ports:
       - "8082:8082"
     depends_on:

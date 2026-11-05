@@ -1,5 +1,7 @@
 package com.beca.transactions.adapter.in.web;
 
+import com.beca.transactions.domain.exception.AccountNotFoundException;
+import com.beca.transactions.domain.exception.AccountServiceUnavailableException;
 import com.beca.transactions.domain.exception.InvalidTransactionException;
 import com.beca.transactions.domain.exception.TransactionNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TransactionNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(TransactionNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(AccountNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAccountNotFound(AccountNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    // A mensagem da exceção traz detalhes técnicos da falha, então não vai para o cliente
+    @ExceptionHandler(AccountServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleAccountServiceUnavailable(AccountServiceUnavailableException ex) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "Serviço de saldo indisponível, tente novamente mais tarde!");
     }
 
     @ExceptionHandler(InvalidTransactionException.class)
