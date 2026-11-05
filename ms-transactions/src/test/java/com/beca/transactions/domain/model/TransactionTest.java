@@ -165,7 +165,7 @@ class TransactionTest {
 
     private static Transaction gravada(Long id, String valor) {
         return new Transaction(id, 1L, TransactionType.DEPOSIT, new BigDecimal(valor), "Depósito",
-                Category.OUTROS, null, null, TransactionStatus.APPROVED, null, Instant.now());
+                Category.OUTROS, null, null, TransactionStatus.APPROVED, null, null, Instant.now());
     }
 
     @Test
