@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Component
 public class TransactionRepositoryAdapter implements TransactionRepositoryPort {
@@ -58,5 +59,10 @@ public class TransactionRepositoryAdapter implements TransactionRepositoryPort {
     @Override
     public boolean hasApprovedCorrection(Long correctedTransactionId) {
         return repository.existsByCorrectedTransactionIdAndStatus(correctedTransactionId, TransactionStatus.APPROVED);
+    }
+
+    @Override
+    public Set<Long> findReversedTransactionIds(Long userId) {
+        return repository.findCorrectedIds(userId, TransactionStatus.APPROVED);
     }
 }

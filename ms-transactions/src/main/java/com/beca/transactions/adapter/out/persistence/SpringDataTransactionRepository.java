@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 public interface SpringDataTransactionRepository extends JpaRepository<TransactionEntity, Long> {
     List<TransactionEntity> findByUserIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc (
@@ -33,4 +34,12 @@ public interface SpringDataTransactionRepository extends JpaRepository<Transacti
                                  @Param("end") Instant end);
 
     boolean existsByCorrectedTransactionIdAndStatus(Long correctedTransactionId, TransactionStatus status);
+
+    @Query("""
+    select t.correctedTransactionId from TransactionEntity t
+    where t.userId = :userId
+    and t.status = :status
+    and t.correctedTransactionId is not null
+    """)
+    Set<Long> findCorrectedIds(@Param("userId") Long userId, @Param("status") TransactionStatus status);
 }
