@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -35,9 +36,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -424,5 +428,167 @@ class TransactionServiceTest {
         service.findByUser(1L, null, null, null);
 
         verifyNoInteractions(exchangeRatePort);
+    }
+
+    // Compara BigDecimal pelo valor: -100 e -100.00 são iguais aqui, mas diferentes no equals
+    private static BigDecimal valor(String esperado) {
+        return argThat(atual -> atual != null && atual.compareTo(new BigDecimal(esperado)) == 0);
+    }
+
+    private void compraDentroDosLimites() {
+        when(accountBalancePort.findByUserId(1L)).thenReturn(conta());
+        when(repository.sumApprovedOutgoing(eq(1L), any(), any())).thenReturn(BigDecimal.ZERO);
+    }
+
+    private static CreateTransactionCommand transferenciaParaUsuario2(String valor) {
+        return new CreateTransactionCommand(1L, TransactionType.TRANSFER, new BigDecimal(valor), "Aluguel",
+                null, 2L, null);
+    }
+
+    @Test
+    void create_deveDebitarSaldoNaCompraAprovada() {
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+
+        service.create(comando(TransactionType.PURCHASE, "200", Category.LAZER));
+
+        verify(accountBalancePort).adjustBalance(eq(1L), valor("-200"));
+    }
+
+    @Test
+    void create_deveDebitarSaldoNaRetiradaAprovada() {
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+
+        service.create(comando(TransactionType.WITHDRAWAL, "150", null));
+
+        verify(accountBalancePort).adjustBalance(eq(1L), valor("-150"));
+    }
+
+    @Test
+    void create_deveCreditarSaldoNoDepositoSemConsultarLimites() {
+        saveDevolveOQueRecebeu();
+
+        service.create(comando(TransactionType.DEPOSIT, "300", null));
+
+        verify(accountBalancePort).adjustBalance(eq(1L), valor("300"));
+        verify(accountBalancePort, never()).findByUserId(anyLong());
+    }
+
+    @Test
+    void create_deveDebitarOrigemECreditarDestinoNaTransferencia() {
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+
+        service.create(transferenciaParaUsuario2("100"));
+
+        verify(accountBalancePort).adjustBalance(eq(1L), valor("-100"));
+        verify(accountBalancePort).adjustBalance(eq(2L), valor("100"));
+    }
+
+    @Test
+    void create_deveCreditarSaldoNaCorrecaoAprovada() {
+        when(repository.findById(10L)).thenReturn(Optional.of(transacaoGravada(10L, 1L)));
+        saveDevolveOQueRecebeu();
+
+        service.create(correcao(10L));
+
+        verify(accountBalancePort).adjustBalance(eq(1L), valor("50"));
+    }
+
+    @Test
+    void create_naoDeveMexerNoSaldoQuandoATransacaoERejeitada() {
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(comando(TransactionType.PURCHASE, "800", Category.LAZER));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
+        verify(accountBalancePort, never()).adjustBalance(anyLong(), any());
+    }
+
+    @Test
+    void create_naoDeveCreditarDestinoQuandoATransferenciaERejeitada() {
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+
+        Transaction result = service.create(transferenciaParaUsuario2("800"));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.REJECTED);
+        verify(accountBalancePort, never()).adjustBalance(anyLong(), any());
+    }
+
+    @Test
+    void create_deveAtualizarSaldoSoDepoisDeGravar() {
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+
+        service.create(comando(TransactionType.PURCHASE, "200", Category.LAZER));
+
+        InOrder ordem = inOrder(repository, accountBalancePort);
+        ordem.verify(repository).save(any(Transaction.class));
+        ordem.verify(accountBalancePort).adjustBalance(eq(1L), any());
+    }
+
+    @Test
+    void create_naoDeveMexerNoSaldoQuandoAGravacaoFalha() {
+        compraDentroDosLimites();
+        when(repository.save(any(Transaction.class))).thenThrow(new IllegalStateException("banco fora do ar"));
+
+        assertThatThrownBy(() -> service.create(comando(TransactionType.PURCHASE, "200", Category.LAZER)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(accountBalancePort, never()).adjustBalance(anyLong(), any());
+    }
+
+    @Test
+    void create_deveManterATransacaoQuandoAAtualizacaoDoSaldoFalha() {
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+        doThrow(new AccountServiceUnavailableException("fora do ar"))
+                .when(accountBalancePort).adjustBalance(anyLong(), any());
+
+        Transaction result = service.create(comando(TransactionType.PURCHASE, "200", Category.LAZER));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+        verify(repository).save(result);
+    }
+
+    @Test
+    void create_deveManterODepositoQuandoOUsuarioNaoTemConta() {
+        saveDevolveOQueRecebeu();
+        doThrow(new AccountNotFoundException("sem conta"))
+                .when(accountBalancePort).adjustBalance(anyLong(), any());
+
+        Transaction result = service.create(comando(TransactionType.DEPOSIT, "100", null));
+
+        assertThat(result.getStatus()).isEqualTo(TransactionStatus.APPROVED);
+        verify(repository).save(result);
+    }
+
+    @Test
+    void create_deveTentarCreditarODestinoMesmoSeODebitoDaOrigemFalhar() {
+        compraDentroDosLimites();
+        saveDevolveOQueRecebeu();
+        doThrow(new AccountServiceUnavailableException("fora do ar"))
+                .when(accountBalancePort).adjustBalance(eq(1L), any());
+
+        service.create(transferenciaParaUsuario2("100"));
+
+        verify(accountBalancePort).adjustBalance(eq(2L), valor("100"));
+    }
+
+    @Test
+    void create_deveFalharAoCorrigirTransacaoRejeitada() {
+        Transaction rejeitada = new Transaction(10L, 1L, TransactionType.PURCHASE, new BigDecimal("50"), "Compra",
+                Category.LAZER, null, null, TransactionStatus.REJECTED, "Saldo insuficiente", null, Instant.now());
+        when(repository.findById(10L)).thenReturn(Optional.of(rejeitada));
+
+        assertThatThrownBy(() -> service.create(correcao(10L)))
+                .isInstanceOf(InvalidTransactionException.class)
+                .hasMessage("Só é possível corrigir transações aprovadas");
+
+        verify(repository, never()).save(any());
+        verifyNoInteractions(accountBalancePort);
     }
 }
