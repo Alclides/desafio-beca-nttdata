@@ -150,6 +150,23 @@ public class TransactionController {
         return ResponseEntity.ok(transactions);
     }
 
+    @Operation(summary = "Baixa o relatório de transações em CSV",
+            description = "Traz só as transações do usuário autenticado, da mais recente para a mais antiga. "
+                    + "Sem período informado, usa o mês atual. O arquivo usa ponto e vírgula e UTF-8 com BOM, "
+                    + "para abrir direto no Excel em português.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Arquivo CSV; só com o cabeçalho quando não há transações no período",
+                    content = @Content(mediaType = "text/csv", schema = @Schema(type = "string"),
+                            examples = @ExampleObject(value = ApiExamples.REPORT_CSV))),
+            @ApiResponse(responseCode = "400", description = "Data em formato inválido ou período invertido",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ApiExamples.INVALID_PERIOD))),
+            @ApiResponse(responseCode = "401", description = "E-mail ou senha ausentes ou incorretos",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ApiExamples.UNAUTHORIZED)))
+    })
     @GetMapping("/report")
     public ResponseEntity<byte[]> report(
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,

@@ -96,4 +96,10 @@ class SecurityConfigTest {
         }
         verifyNoInteractions(userAuthenticationPort);
     }
+
+    @Test
+    void relatorioSemCredenciais_deveRetornar401() throws Exception {
+        mockMvc.perform(get("/transactions/report"))
+                .andExpect(status().isUnauthorized());
+    }
 }
