@@ -6,19 +6,18 @@ import com.beca.transactions.domain.exception.AccountServiceUnavailableException
 import com.beca.transactions.domain.model.AccountBalance;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(AccountController.class)
 class AccountControllerTest {
 
@@ -33,7 +32,7 @@ class AccountControllerTest {
         when(findAccountBalanceUseCase.findByUserId(1L)).thenReturn(new AccountBalance(
                 1L, new BigDecimal("1000.00"), new BigDecimal("2000.00"), new BigDecimal("500.00")));
 
-        mockMvc.perform(get("/users/1/balance"))
+        mockMvc.perform(get("/users/1/balance").with(TestLogin.as(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(1))
                 .andExpect(jsonPath("$.balance").value(1000.00))
@@ -46,7 +45,7 @@ class AccountControllerTest {
         when(findAccountBalanceUseCase.findByUserId(99L))
                 .thenThrow(new AccountNotFoundException("Conta não encontrada para o usuário: 99"));
 
-        mockMvc.perform(get("/users/99/balance"))
+        mockMvc.perform(get("/users/99/balance").with(TestLogin.as(99L)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Conta não encontrada para o usuário: 99"));
     }
@@ -56,8 +55,16 @@ class AccountControllerTest {
         when(findAccountBalanceUseCase.findByUserId(1L))
                 .thenThrow(new AccountServiceUnavailableException("Falha ao consultar serviço de saldo: timeout"));
 
-        mockMvc.perform(get("/users/1/balance"))
+        mockMvc.perform(get("/users/1/balance").with(TestLogin.as(1L)))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.message").value("Serviço de saldo indisponível, tente novamente mais tarde!"));
+    }
+
+    @Test
+    void findBalance_deveRetornar403ParaOutroUsuario() throws Exception {
+        mockMvc.perform(get("/users/1/balance").with(TestLogin.as(2L)))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(findAccountBalanceUseCase);
     }
 }

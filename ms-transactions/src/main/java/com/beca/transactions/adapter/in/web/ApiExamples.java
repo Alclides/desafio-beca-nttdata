@@ -113,4 +113,9 @@ final class ApiExamples {
             {"status": 404, "error": "Not Found", "message": "Transação não encontrada: 99",
              "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
             """;
+
+    static final String FORBIDDEN = """
+            {"status": 403, "error": "Forbidden", "message": "Acesso negado: estes dados pertencem a outro usuário",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
 }

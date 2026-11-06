@@ -3,6 +3,7 @@ package com.beca.transactions.adapter.in.web;
 import com.beca.transactions.domain.exception.AccountNotFoundException;
 import com.beca.transactions.domain.exception.AccountServiceUnavailableException;
 import com.beca.transactions.domain.exception.InvalidTransactionException;
+import com.beca.transactions.domain.exception.ResourceAccessDeniedException;
 import com.beca.transactions.domain.exception.TransactionNotFoundException;
 import com.beca.transactions.domain.exception.UserNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TransactionNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(TransactionNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(ResourceAccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(ResourceAccessDeniedException ex) {
+        return build(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
     @ExceptionHandler(UserNotFoundException.class)
