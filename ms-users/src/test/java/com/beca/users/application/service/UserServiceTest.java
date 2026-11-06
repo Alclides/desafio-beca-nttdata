@@ -5,6 +5,7 @@ import com.beca.users.application.port.in.UpdateUserUseCase.UpdateUserCommand;
 import com.beca.users.application.port.out.PasswordEncoderPort;
 import com.beca.users.application.port.out.UserRepositoryPort;
 import com.beca.users.domain.exception.EmailAlreadyExistsException;
+import com.beca.users.domain.exception.InvalidCredentialsException;
 import com.beca.users.domain.exception.UserNotFoundException;
 import com.beca.users.domain.model.User;
 import org.junit.jupiter.api.Test;
@@ -167,5 +168,32 @@ class UserServiceTest {
                 .isInstanceOf(UserNotFoundException.class);
 
         verify(repository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void authenticate_deveRetornarOUsuarioComSenhaCerta() {
+        when(repository.findByEmail("maria@teste.com")).thenReturn(Optional.of(existingUser()));
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+
+        assertThat(service.authenticate("maria@teste.com", "123456").getId()).isEqualTo(1L);
+    }
+
+    @Test
+    void authenticate_deveFalharComSenhaErrada() {
+        when(repository.findByEmail("maria@teste.com")).thenReturn(Optional.of(existingUser()));
+        when(passwordEncoder.matches("errada", "hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.authenticate("maria@teste.com", "errada"))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("E-mail ou senha incorretos");
+    }
+
+    @Test
+    void authenticate_deveDarAMesmaMensagemComEmailDesconhecido() {
+        when(repository.findByEmail("ninguem@teste.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.authenticate("ninguem@teste.com", "123456"))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("E-mail ou senha incorretos");
     }
 }

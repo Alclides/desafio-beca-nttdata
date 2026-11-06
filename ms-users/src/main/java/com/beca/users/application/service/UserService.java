@@ -1,5 +1,6 @@
 package com.beca.users.application.service;
 
+import com.beca.users.application.port.in.AuthenticateUserUseCase;
 import com.beca.users.application.port.in.CreateUserUseCase;
 import com.beca.users.application.port.in.DeleteUserUseCase;
 import com.beca.users.application.port.in.FindUserUseCase;
@@ -7,13 +8,15 @@ import com.beca.users.application.port.in.UpdateUserUseCase;
 import com.beca.users.application.port.out.PasswordEncoderPort;
 import com.beca.users.application.port.out.UserRepositoryPort;
 import com.beca.users.domain.exception.EmailAlreadyExistsException;
+import com.beca.users.domain.exception.InvalidCredentialsException;
 import com.beca.users.domain.exception.UserNotFoundException;
 import com.beca.users.domain.model.User;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
-public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUserUseCase, DeleteUserUseCase {
+public class UserService implements AuthenticateUserUseCase, CreateUserUseCase, FindUserUseCase, UpdateUserUseCase, DeleteUserUseCase {
 
     private final UserRepositoryPort repository;
     private final PasswordEncoderPort passwordEncoder;
@@ -25,15 +28,16 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
 
     @Override
     public User create(CreateUserCommand command) {
-        if (repository.existsByEmail(command.email())) {
-            throw new EmailAlreadyExistsException("E-mail já cadastrado: " + command.email());
+        String email = normalizeEmail(command.email());
+        if (repository.existsByEmail(email)) {
+            throw new EmailAlreadyExistsException("E-mail já cadastrado: " + email);
         }
 
         Instant now = Instant.now();
         User user = new User(
                 null,
                 command.name(),
-                command.email(),
+                email,
                 passwordEncoder.encode(command.password()),
                 now,
                 now
@@ -53,16 +57,17 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     }
 
     @Override
-    public User update(Long id, UpdateUserCommand command) {
+    public User update(Long id, UpdateUserUseCase.UpdateUserCommand command) {
         User user = findById(id);
+        String email = normalizeEmail(command.email());
 
-        boolean emailChanged = !user.getEmail().equals(command.email());
-        if (emailChanged && repository.existsByEmail(command.email())) {
-            throw new EmailAlreadyExistsException("E-mail já cadastrado: " + command.email());
+        boolean emailChanged = !user.getEmail().equals(email);
+        if (emailChanged && repository.existsByEmail(email)) {
+            throw new EmailAlreadyExistsException("E-mail já cadastrado: " + email);
         }
 
         user.setName(command.name());
-        user.setEmail(command.email());
+        user.setEmail(email);
         user.setUpdatedAt(Instant.now());
         return repository.save(user);
     }
@@ -73,5 +78,17 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
             throw new UserNotFoundException("Usuário não encontrado: " + id);
         }
         repository.deleteById(id);
+    }
+
+    // A mesma mensagem nos dois casos, para não revelar quais e-mails estão cadastrados
+    @Override
+    public User authenticate(String email, String password) {
+        return repository.findByEmail(normalizeEmail(email))
+                .filter(user -> passwordEncoder.matches(password, user.getPassword()))
+                .orElseThrow(() -> new InvalidCredentialsException("E-mail ou senha incorretos"));
+    }
+
+    private static String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

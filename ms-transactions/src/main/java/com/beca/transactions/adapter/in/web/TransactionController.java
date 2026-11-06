@@ -2,8 +2,10 @@ package com.beca.transactions.adapter.in.web;
 
 import com.beca.transactions.application.port.in.CreateTransactionUseCase;
 import com.beca.transactions.application.port.in.FindTransactionUseCase;
+import com.beca.transactions.domain.model.AuthenticatedUser;
 import com.beca.transactions.domain.model.Transaction;
 import com.beca.transactions.domain.model.TransactionType;
+import com.beca.transactions.domain.service.OwnershipPolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -14,7 +16,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -72,6 +78,9 @@ public class TransactionController {
                                     @ExampleObject(name = "Validação de campos", value = ApiExamples.VALIDATION),
                                     @ExampleObject(name = "Regra de negócio", value = ApiExamples.BUSINESS_RULE)
                             })),
+            @ApiResponse(responseCode = "403", description = "Os dados pertencem a outro usuário",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ApiExamples.FORBIDDEN))),
             @ApiResponse(responseCode = "404", description = "Usuário, destino da transferência ou transação a corrigir não encontrados",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                             examples = {
@@ -80,8 +89,10 @@ public class TransactionController {
                             }))
     })
     @PostMapping
-    public ResponseEntity<TransactionResponse> create(@Valid @RequestBody CreateTransactionRequest request,
-                                                      UriComponentsBuilder uriBuilder) {
+    public ResponseEntity<TransactionResponse> create(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+            @Valid @RequestBody CreateTransactionRequest request, UriComponentsBuilder uriBuilder) {
+        OwnershipPolicy.ensureOwner(user.id(), request.userId());
         Transaction transaction = createTransactionUseCase.create(request.command());
 
         URI location = uriBuilder.path("/transactions/{id}").buildAndExpand(transaction.getId()).toUri();
@@ -93,13 +104,20 @@ public class TransactionController {
                     + "tenta buscar de novo e grava; se a BrasilAPI falhar, responde com conversion.available = false.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Transação encontrada"),
+            @ApiResponse(responseCode = "403", description = "Os dados pertencem a outro usuário",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ApiExamples.FORBIDDEN))),
             @ApiResponse(responseCode = "404", description = "Transação não encontrada",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = ApiExamples.NOT_FOUND)))
     })
     @GetMapping("/{id}")
-    public ResponseEntity<TransactionResponse> findById(@PathVariable Long id) {
-        return ResponseEntity.ok(TransactionResponse.from(findTransactionUseCase.findById(id)));
+    public ResponseEntity<TransactionResponse> findById(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long id) {
+        Transaction transaction = findTransactionUseCase.findById(id);
+        OwnershipPolicy.ensureOwner(user.id(), transaction.getUserId());
+        return ResponseEntity.ok(TransactionResponse.from(transaction));
     }
 
     @Operation(summary = "Lista as transações de um usuário",
@@ -107,12 +125,16 @@ public class TransactionController {
                     + "Não chama a BrasilAPI: transações sem taxa vêm com conversion.available = false.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de transações; vazia quando não há nenhuma no período"),
+            @ApiResponse(responseCode = "403", description = "Os dados pertencem a outro usuário",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ApiExamples.FORBIDDEN))),
             @ApiResponse(responseCode = "400", description = "Parâmetro ausente, data em formato inválido ou período invertido",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = ApiExamples.INVALID_PERIOD)))
     })
     @GetMapping
     public ResponseEntity<List<TransactionResponse>> findByUser(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
             @Parameter(description = "Usuário dono das transações", example = "1")
             @RequestParam Long userId,
             @Parameter(description = "Data inicial (inclusiva), formato AAAA-MM-DD", example = "2026-11-01")
@@ -121,9 +143,41 @@ public class TransactionController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @Parameter(description = "Filtra por tipo")
             @RequestParam(required = false) TransactionType type) {
+        OwnershipPolicy.ensureOwner(user.id(), userId);
         List<TransactionResponse> transactions = findTransactionUseCase.findByUser(userId, from, to, type).stream()
                 .map(TransactionResponse::from)
                 .toList();
         return ResponseEntity.ok(transactions);
+    }
+
+    @Operation(summary = "Baixa o relatório de transações em CSV",
+            description = "Traz só as transações do usuário autenticado, da mais recente para a mais antiga. "
+                    + "Sem período informado, usa o mês atual. O arquivo usa ponto e vírgula e UTF-8 com BOM, "
+                    + "para abrir direto no Excel em português.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Arquivo CSV; só com o cabeçalho quando não há transações no período",
+                    content = @Content(mediaType = "text/csv", schema = @Schema(type = "string"),
+                            examples = @ExampleObject(value = ApiExamples.REPORT_CSV))),
+            @ApiResponse(responseCode = "400", description = "Data em formato inválido ou período invertido",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ApiExamples.INVALID_PERIOD))),
+            @ApiResponse(responseCode = "401", description = "E-mail ou senha ausentes ou incorretos",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ApiExamples.UNAUTHORIZED)))
+    })
+    @GetMapping("/report")
+    public ResponseEntity<byte[]> report(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+            @Parameter(description = "Data inicial (inclusiva), formato AAAA-MM-DD", example = "2026-11-01")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @Parameter(description = "Data final (inclusiva), formato AAAA-MM-DD", example = "2026-11-30")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        byte[] csv = TransactionReportCsv.toCsv(findTransactionUseCase.findByUser(user.id(), from, to, null));
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"relatorio-transacoes.csv\"")
+                .body(csv);
     }
 }
