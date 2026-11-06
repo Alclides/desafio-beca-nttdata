@@ -118,4 +118,15 @@ final class ApiExamples {
             {"status": 403, "error": "Forbidden", "message": "Acesso negado: estes dados pertencem a outro usuário",
              "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
             """;
+
+    static final String REPORT_CSV = """
+        data;tipo;categoria;descrição;valor em real;status;motivo
+        05/11/2026;PURCHASE;LAZER;Cinema;150,50;APPROVED;
+        05/11/2026;WITHDRAWAL;OUTROS;Saque;9000,00;REJECTED;Saldo insuficiente
+        """;
+
+    static final String UNAUTHORIZED = """
+        {"status": 401, "error": "Unauthorized", "message": "Informe e-mail e senha válidos",
+         "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+        """;
 }
