@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ public class AuthController {
         this.authenticateUserUseCase = authenticateUserUseCase;
     }
 
+    @SecurityRequirements()
     @Operation(summary = "Confere e-mail e senha de um usuário")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Credenciais corretas"),

@@ -1,5 +1,6 @@
 package com.beca.users.adapter.in.web;
 
+import com.beca.users.adapter.in.security.AuthenticatedUser;
 import com.beca.users.application.port.in.CreateUserUseCase;
 import com.beca.users.application.port.in.CreateUserUseCase.CreateUserCommand;
 import com.beca.users.application.port.in.DeleteUserUseCase;
@@ -7,16 +8,20 @@ import com.beca.users.application.port.in.FindUserUseCase;
 import com.beca.users.application.port.in.UpdateUserUseCase;
 import com.beca.users.application.port.in.UpdateUserUseCase.UpdateUserCommand;
 import com.beca.users.domain.model.User;
+import com.beca.users.domain.service.OwnershipPolicy;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -57,6 +62,7 @@ public class UserController {
         this.csvUserImporter = csvUserImporter;
     }
 
+    @SecurityRequirements()
     @Operation(summary = "Cria um novo usuário")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Usuário criado com sucesso"),
@@ -77,6 +83,7 @@ public class UserController {
         return ResponseEntity.created(location).body(UserResponse.from(user));
     }
 
+    @SecurityRequirements()
     @Operation(summary = "Cria usuários a partir de um arquivo CSV",
             description = "Colunas: name,email,password. Linhas inválidas não interrompem a importação "
                     + "e voltam no resumo com o número da linha e o motivo.")
@@ -99,9 +106,13 @@ public class UserController {
         }
     }
 
-    @Operation(summary = "Busca um usuário pelo ID")
+    @Operation(summary = "Busca um usuário pelo ID",
+            description = "Qualquer usuário logado pode consultar: a transferência precisa confirmar que o destino existe")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
+            @ApiResponse(responseCode = "401", description = "Sem login ou credenciais inválidas",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.UNAUTHORIZED))),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = ErrorExamples.NOT_FOUND)))
@@ -113,7 +124,10 @@ public class UserController {
 
     @Operation(summary = "Lista todos os usuários")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de usuários; vazia quando não há cadastros")
+            @ApiResponse(responseCode = "200", description = "Lista de usuários; vazia quando não há cadastros"),
+            @ApiResponse(responseCode = "401", description = "Sem login ou credenciais inválidas",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.UNAUTHORIZED)))
     })
     @GetMapping
     public ResponseEntity<List<UserResponse>> findAll() {
@@ -123,12 +137,18 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
-    @Operation(summary = "Atualiza nome e e-mail de um usuário existente")
+    @Operation(summary = "Atualiza nome e e-mail da própria conta")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuário atualizado com sucesso"),
             @ApiResponse(responseCode = "400", description = "Dados inválidos",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = ErrorExamples.VALIDATION))),
+            @ApiResponse(responseCode = "401", description = "Sem login ou credenciais inválidas",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.UNAUTHORIZED))),
+            @ApiResponse(responseCode = "403", description = "A conta pertence a outro usuário",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.FORBIDDEN))),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = ErrorExamples.NOT_FOUND))),
@@ -137,21 +157,31 @@ public class UserController {
                             examples = @ExampleObject(value = ErrorExamples.EMAIL_CONFLICT)))
     })
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> update(@PathVariable Long id,
+    public ResponseEntity<UserResponse> update(@Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+                                               @PathVariable Long id,
                                                @Valid @RequestBody UpdateUserRequest request) {
-        User user = updateUserUseCase.update(id, new UpdateUserCommand(request.name(), request.email()));
-        return ResponseEntity.ok(UserResponse.from(user));
+        OwnershipPolicy.ensureOwner(user.id(), id);
+        User updated = updateUserUseCase.update(id, new UpdateUserCommand(request.name(), request.email()));
+        return ResponseEntity.ok(UserResponse.from(updated));
     }
 
-    @Operation(summary = "Remove um usuário existente")
+    @Operation(summary = "Remove a própria conta")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Usuário removido com sucesso", content = @Content()),
+            @ApiResponse(responseCode = "401", description = "Sem login ou credenciais inválidas",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.UNAUTHORIZED))),
+            @ApiResponse(responseCode = "403", description = "A conta pertence a outro usuário",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = ErrorExamples.FORBIDDEN))),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = ErrorExamples.NOT_FOUND)))
     })
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+                                       @PathVariable Long id) {
+        OwnershipPolicy.ensureOwner(user.id(), id);
         deleteUserUseCase.delete(id);
         return ResponseEntity.noContent().build();
     }

@@ -1,11 +1,14 @@
 package com.beca.users.adapter.in.web;
 
+import com.beca.users.adapter.in.security.UserAuthenticationProvider;
 import com.beca.users.application.port.in.AuthenticateUserUseCase;
+import com.beca.users.config.SecurityConfig;
 import com.beca.users.domain.exception.InvalidCredentialsException;
 import com.beca.users.domain.model.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
+@Import({SecurityConfig.class, UserAuthenticationProvider.class, SecurityErrorResponder.class})
 class AuthControllerTest {
 
     private static final String BODY = """

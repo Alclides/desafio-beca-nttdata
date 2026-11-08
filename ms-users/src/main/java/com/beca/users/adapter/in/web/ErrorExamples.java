@@ -36,4 +36,14 @@ final class ErrorExamples {
             {"status": 401, "error": "Unauthorized", "message": "E-mail ou senha incorretos",
              "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
             """;
+
+    static final String UNAUTHORIZED = """
+            {"status": 401, "error": "Unauthorized", "message": "Informe e-mail e senha válidos",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
+
+    static final String FORBIDDEN = """
+            {"status": 403, "error": "Forbidden", "message": "Acesso negado: só é possível alterar a própria conta",
+             "fields": null, "timestamp": "2026-11-03T18:00:00Z"}
+            """;
 }
