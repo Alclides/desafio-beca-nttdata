@@ -2,15 +2,22 @@ package com.beca.transactions.adapter.out.user;
 
 import com.beca.transactions.domain.exception.UserServiceUnavailableException;
 import com.beca.transactions.domain.model.AuthenticatedUser;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.client.RestClientTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -30,6 +37,35 @@ class UserServiceAdapterTest {
 
     @Autowired
     private MockRestServiceServer server;
+
+    @AfterEach
+    void limparContexto() {
+        RequestContextHolder.resetRequestAttributes();
+    }
+
+    @Test
+    void exists_deveRepassarOCabecalhoDeLoginRecebido() {
+        MockHttpServletRequest entrada = new MockHttpServletRequest();
+        entrada.addHeader(HttpHeaders.AUTHORIZATION, "Basic dGVzdGU6c2VuaGE=");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(entrada));
+
+        server.expect(requestTo(URL))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Basic dGVzdGU6c2VuaGE="))
+                .andRespond(withSuccess("{\"id\": 1}", MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.exists(1L)).isTrue();
+        server.verify();
+    }
+
+    @Test
+    void exists_naoDeveEnviarCabecalhoQuandoNaoHaRequisicaoDeEntrada() {
+        server.expect(requestTo(URL))
+                .andExpect(headerDoesNotExist(HttpHeaders.AUTHORIZATION))
+                .andRespond(withSuccess("{\"id\": 1}", MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.exists(1L)).isTrue();
+        server.verify();
+    }
 
     @Test
     void exists_deveRetornarTrueQuandoOUsuarioExiste() {

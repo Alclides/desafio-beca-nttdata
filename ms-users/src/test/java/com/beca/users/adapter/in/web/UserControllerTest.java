@@ -1,18 +1,22 @@
 package com.beca.users.adapter.in.web;
 
+import com.beca.users.adapter.in.security.UserAuthenticationProvider;
 import com.beca.users.adapter.in.web.UserImportResponse.LineError;
+import com.beca.users.application.port.in.AuthenticateUserUseCase;
 import com.beca.users.application.port.in.CreateUserUseCase;
 import com.beca.users.application.port.in.CreateUserUseCase.CreateUserCommand;
 import com.beca.users.application.port.in.DeleteUserUseCase;
 import com.beca.users.application.port.in.FindUserUseCase;
 import com.beca.users.application.port.in.UpdateUserUseCase;
 import com.beca.users.application.port.in.UpdateUserUseCase.UpdateUserCommand;
+import com.beca.users.config.SecurityConfig;
 import com.beca.users.domain.exception.EmailAlreadyExistsException;
 import com.beca.users.domain.exception.UserNotFoundException;
 import com.beca.users.domain.model.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -40,10 +44,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
+@Import({SecurityConfig.class, UserAuthenticationProvider.class, SecurityErrorResponder.class})
 class UserControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    // O provider de login precisa dele
+    @MockitoBean
+    private AuthenticateUserUseCase authenticateUserUseCase;
 
     @MockitoBean
     private CreateUserUseCase createUserUseCase;
@@ -167,7 +176,7 @@ class UserControllerTest {
     void findById_deveRetornar200() throws Exception {
         when(findUserUseCase.findById(1L)).thenReturn(user(1L, "Maria", "maria@teste.com"));
 
-        mockMvc.perform(get("/users/1"))
+        mockMvc.perform(get("/users/1").with(TestLogin.as(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.email").value("maria@teste.com"));
@@ -177,7 +186,7 @@ class UserControllerTest {
     void findById_deveRetornar404QuandoNaoExiste() throws Exception {
         when(findUserUseCase.findById(99L)).thenThrow(new UserNotFoundException("Usuário não encontrado: 99"));
 
-        mockMvc.perform(get("/users/99"))
+        mockMvc.perform(get("/users/99").with(TestLogin.as(1L)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("Usuário não encontrado: 99"));
@@ -189,7 +198,7 @@ class UserControllerTest {
                 user(1L, "Maria", "maria@teste.com"),
                 user(2L, "João", "joao@teste.com")));
 
-        mockMvc.perform(get("/users"))
+        mockMvc.perform(get("/users").with(TestLogin.as(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[1].name").value("João"));
@@ -200,7 +209,7 @@ class UserControllerTest {
         when(updateUserUseCase.update(eq(1L), eq(new UpdateUserCommand("Maria Silva", "novo@teste.com"))))
                 .thenReturn(user(1L, "Maria Silva", "novo@teste.com"));
 
-        mockMvc.perform(put("/users/1")
+        mockMvc.perform(put("/users/1").with(TestLogin.as(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Maria Silva", "email": "novo@teste.com"}
@@ -212,7 +221,7 @@ class UserControllerTest {
 
     @Test
     void update_deveRetornar400QuandoDadosInvalidos() throws Exception {
-        mockMvc.perform(put("/users/1")
+        mockMvc.perform(put("/users/1").with(TestLogin.as(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "", "email": ""}
@@ -226,7 +235,7 @@ class UserControllerTest {
 
     @Test
     void delete_deveRetornar204() throws Exception {
-        mockMvc.perform(delete("/users/1"))
+        mockMvc.perform(delete("/users/1").with(TestLogin.as(1L)))
                 .andExpect(status().isNoContent());
 
         verify(deleteUserUseCase).delete(1L);
@@ -236,8 +245,50 @@ class UserControllerTest {
     void delete_deveRetornar404QuandoNaoExiste() throws Exception {
         doThrow(new UserNotFoundException("Usuário não encontrado: 99")).when(deleteUserUseCase).delete(99L);
 
-        mockMvc.perform(delete("/users/99"))
+        mockMvc.perform(delete("/users/99").with(TestLogin.as(99L)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void findAll_deveRetornar401SemLogin() throws Exception {
+        mockMvc.perform(get("/users"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist("WWW-Authenticate"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Informe e-mail e senha válidos"));
+
+        verifyNoInteractions(findUserUseCase);
+    }
+
+    @Test
+    void findById_devePermitirConsultarOutroUsuario() throws Exception {
+        when(findUserUseCase.findById(2L)).thenReturn(user(2L, "João", "joao@teste.com"));
+
+        mockMvc.perform(get("/users/2").with(TestLogin.as(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(2));
+    }
+
+    @Test
+    void update_deveRetornar403QuandoAContaEDeOutroUsuario() throws Exception {
+        mockMvc.perform(put("/users/2").with(TestLogin.as(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Invasor", "email": "invasor@teste.com"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message").value("Acesso negado: só é possível alterar a própria conta"));
+
+        verifyNoInteractions(updateUserUseCase);
+    }
+
+    @Test
+    void delete_deveRetornar403QuandoAContaEDeOutroUsuario() throws Exception {
+        mockMvc.perform(delete("/users/2").with(TestLogin.as(1L)))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(deleteUserUseCase);
     }
 }

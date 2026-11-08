@@ -2,6 +2,7 @@ package com.beca.users.adapter.in.web;
 
 import com.beca.users.domain.exception.EmailAlreadyExistsException;
 import com.beca.users.domain.exception.InvalidCredentialsException;
+import com.beca.users.domain.exception.ResourceAccessDeniedException;
 import com.beca.users.domain.exception.UserNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
         return build(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(ResourceAccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(ResourceAccessDeniedException ex) {
+        return build(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
     @ExceptionHandler(EmailAlreadyExistsException.class)
