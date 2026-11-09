@@ -38,6 +38,13 @@ Cada serviço tem seu próprio banco. O ms-transactions pergunta ao ms-users se 
 - Uma conta no [mockapi.io](https://mockapi.io) (é de graça)
 - JDK 21 e Maven, só se for rodar pela IDE
 
+## Deploy na Azure
+
+O projeto também está disponível numa VM da Azure! Os links do Swagger são:
+
+- ms-users: <http://172.215.136.28:8081/swagger-ui.html>
+- ms-transactions: <http://172.215.136.28:8082/swagger-ui.html>
+
 ## Como rodar
 
 1. Clone o projeto:
